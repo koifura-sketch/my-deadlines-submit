@@ -14,6 +14,8 @@
             --border-color: #3d3d3d;
             --primary-button: #2196f3;
             --success-color: #4caf50;
+            --danger-color: #f44336;
+            --plan-color: #9c27b0;
         }
 
         body {
@@ -26,7 +28,7 @@
             justify-content: center;
         }
 
-        .container { width: 100%; max-width: 800px; }
+        .container { width: 100%; max-width: 900px; }
         h1, h2, h3 { text-align: center; color: #ffffff; }
 
         .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
@@ -36,6 +38,7 @@
             border-radius: 20px; cursor: pointer; font-weight: bold;
         }
         .tab-btn.active { background-color: var(--primary-button); color: #fff; border-color: var(--primary-button); }
+        .tab-btn.plan-tab-btn.active { background-color: var(--plan-color); border-color: var(--plan-color); }
 
         .page { display: none; }
         .page.active { display: block; }
@@ -53,7 +56,7 @@
         }
         .date-row { display: flex; gap: 10px; }
         button.submit-btn { width: 100%; padding: 14px; background-color: var(--primary-button); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        button.submit-btn.plan-btn { background-color: #9c27b0; }
+        button.submit-btn.plan-btn { background-color: var(--plan-color); }
 
         .task-list { list-style: none; padding: 0; margin: 0 0 30px 0; }
         .task-item {
@@ -66,7 +69,6 @@
 
         .subject-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px; color: #fff; }
         .subject-badge.bg-white { color: #000; }
-        .plan-badge { background-color: #9c27b0; color: #fff; }
 
         .days-left { font-weight: bold; }
         .days-1 { color: #ff4d4d; }
@@ -76,8 +78,9 @@
         .days-5 { color: #adff2f; }
         .days-10 { color: #00ff00; }
 
-        .complete-btn { background-color: #444; color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px 16px; cursor: pointer; font-weight: bold; }
-        .complete-btn:hover { background-color: var(--success-color); }
+        .action-btn { background-color: #444; color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px 16px; cursor: pointer; font-weight: bold; }
+        .action-btn.comp:hover { background-color: var(--success-color); color: #fff; }
+        .action-btn.del:hover { background-color: var(--danger-color); color: #fff; }
 
         .calendar-container { background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 30px; }
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -86,13 +89,17 @@
         .calendar-cell { background: var(--input-bg); min-height: 75px; border-radius: 4px; padding: 4px; font-size: 12px; display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; }
         .calendar-cell .day-num { font-weight: bold; margin-bottom: 3px; }
         .calendar-cell.today { border: 2px solid var(--primary-button); }
+        .calendar-cell.today-plan { border: 2px solid var(--plan-color); }
         
         .cal-item-dot { width: 92%; font-size: 10px; padding: 1px 3px; border-radius: 2px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; text-align: left; }
         .cal-item-dot.bg-white { color: #000; }
 
+        .two-months-grid { display: flex; flex-direction: column; gap: 20px; }
+        @media (min-width: 768px) { .two-months-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } }
+
         .archive-container { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid #2a2a2a; margin-top: 20px; }
         .archive-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; }
-        .archive-select { padding: 8px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; }
+        .archive-title-date { font-size: 14px; background: var(--input-bg); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); font-weight: bold; }
         
         .history-item { opacity: 0.6; border-left: 8px solid #555 !important; }
         .history-date { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
@@ -100,7 +107,6 @@
         .empty-message { text-align: center; color: var(--text-muted); padding: 20px; }
     </style>
 
-    <!-- Firebaseシステム -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -122,7 +128,8 @@
         let globalTasks = [];
         let globalPlans = [];
         let globalHistory = [];
-        let currentCalendarDate = new Date();
+        let taskCalendarDate = new Date();
+        let planCalendarDate = new Date();
 
         const subjects = {
             '数学Ⅰ': { color: '#0055ff', class: '' }, '数学A': { color: '#000080', class: '' },
@@ -134,10 +141,9 @@
         };
 
         document.addEventListener('DOMContentLoaded', () => {
-            initSubjectSelect();
+            initSubjectSelects();
             loadYearPreference();
             setDefaultMonthDay();
-            initArchiveMonthSelect();
             
             // 提出物データの同期
             onValue(ref(db, 'tasks/' + currentUsername), (snapshot) => {
@@ -148,7 +154,7 @@
                         let item = data[key]; item.databaseId = key; globalTasks.push(item);
                     });
                 }
-                renderTasks(); renderCalendar();
+                renderTasks(); renderTaskCalendar();
             });
 
             // 予定表データの同期
@@ -160,7 +166,7 @@
                         let item = data[key]; item.databaseId = key; globalPlans.push(item);
                     });
                 }
-                renderPlans(); renderCalendar();
+                renderPlans(); renderPlanCalendar();
             });
 
             // 完了済み履歴データの同期
@@ -176,27 +182,14 @@
             });
         });
 
-        function initSubjectSelect() {
-            const select = document.getElementById('taskSubject');
-            select.innerHTML = "";
-            for (let sub in subjects) {
-                let opt = document.createElement('option'); opt.value = sub; opt.textContent = sub; select.appendChild(opt);
-            }
-        }
-
-        function initArchiveMonthSelect() {
-            const select = document.getElementById('archiveMonthFilter');
-            select.innerHTML = '';
-            // 直近の過去1年分を選択肢にする
-            const now = new Date();
-            for(let i=0; i<12; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                const txt = `${d.getFullYear()}年 ${d.getMonth()+1}月`;
-                let opt = document.createElement('option'); opt.value = val; opt.textContent = txt;
-                select.appendChild(opt);
-            }
-            select.addEventListener('change', renderHistory);
+        function initSubjectSelects() {
+            ['taskSubject', 'planSubject'].forEach(id => {
+                const select = document.getElementById(id);
+                select.innerHTML = "";
+                for (let sub in subjects) {
+                    let opt = document.createElement('option'); opt.value = sub; opt.textContent = sub; select.appendChild(opt);
+                }
+            });
         }
 
         window.saveYearPreference = function() {
@@ -237,30 +230,35 @@
         // 予定の追加
         window.addPlan = function() {
             const name = document.getElementById('planName').value;
+            const subject = document.getElementById('planSubject').value;
             const year = document.getElementById('planYearSelect').value;
             const monthDay = document.getElementById('planMonthDay').value;
             if (!name || !monthDay) { alert('入力してください！'); return; }
             const finalDeadline = `${year}-${monthDay.split('-')[1]}-${monthDay.split('-')[2]}`;
             
             push(ref(db, 'plans/' + currentUsername), {
-                name: name, deadline: finalDeadline, createdAt: Date.now()
+                name: name, subject: subject, deadline: finalDeadline, createdAt: Date.now()
             });
             document.getElementById('planName').value = '';
             switchPage('page3');
         };
 
-        // タスクを完了にして履歴に移動
+        // タスクを完了にする
         window.completeTask = function(databaseId, name, subject, deadline) {
             if (confirm('完了にしますか？（完了済みリストに移動します）')) {
                 const now = new Date();
                 const completedMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-                
-                // 履歴にプッシュ
                 push(ref(db, 'history/' + currentUsername), {
                     name: name, subject: subject, deadline: deadline, completedAt: Date.now(), completedMonth: completedMonth
                 });
-                // 元データを消去
                 remove(ref(db, 'tasks/' + currentUsername + '/' + databaseId));
+            }
+        };
+
+        // 予定の削除
+        window.deletePlan = function(databaseId) {
+            if (confirm('この予定を削除しますか？')) {
+                remove(ref(db, 'plans/' + currentUsername + '/' + databaseId));
             }
         };
 
@@ -301,7 +299,7 @@
                             <span class="days-left ${daysInfo.class}">(${daysInfo.text})</span>
                         </div>
                     </div>
-                    <button class="complete-btn" onclick="completeTask('${task.databaseId}', '${escapeHTML(task.name)}', '${task.subject}', '${task.deadline}')">完了</button>
+                    <button class="action-btn comp" onclick="completeTask('${task.databaseId}', '${escapeHTML(task.name)}', '${task.subject}', '${task.deadline}')">完了</button>
                 `;
                 taskList.appendChild(li);
             });
@@ -318,30 +316,36 @@
             globalPlans.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
             globalPlans.forEach(plan => {
                 const li = document.createElement('li'); li.className = 'task-item';
-                li.style.borderLeftColor = '#9c27b0';
+                const subInfo = subjects[plan.subject] || { color: '#fff', class: '' };
+                li.style.borderLeftColor = subInfo.color;
                 const daysInfo = getDaysLeftClassAndText(plan.deadline);
                 li.innerHTML = `
                     <div>
                         <div class="task-name">${escapeHTML(plan.name)}</div>
                         <div class="task-details">
-                            <span class="subject-badge plan-badge">予定・テスト</span>
+                            <span class="subject-badge ${subInfo.class}" style="background-color: ${subInfo.color}">${plan.subject}</span>
                             <span>日程: ${plan.deadline} </span>
                             <span class="days-left ${daysInfo.class}">(${daysInfo.text})</span>
                         </div>
                     </div>
+                    <button class="action-btn del" onclick="deletePlan('${plan.databaseId}')">削除</button>
                 `;
                 planList.appendChild(li);
             });
         }
 
-        // 完了済み履歴の描画（月別）
+        // 完了済み履歴の描画（カレンダーの月移動と100%自動連動）
         function renderHistory() {
             const historyList = document.getElementById('historyList');
             const emptyHistoryMessage = document.getElementById('emptyHistoryMessage');
-            const selectedMonth = document.getElementById('archiveMonthFilter').value;
+            const historyMonthTitle = document.getElementById('historyMonthTitle');
+            if(!historyList) return;
+            
             historyList.innerHTML = '';
+            const targetMonthStr = `${taskCalendarDate.getFullYear()}-${String(taskCalendarDate.getMonth()+1).padStart(2,'0')}`;
+            historyMonthTitle.textContent = `${taskCalendarDate.getFullYear()}年 ${taskCalendarDate.getMonth()+1}月 分`;
 
-            const filtered = globalHistory.filter(h => h.completedMonth === selectedMonth);
+            const filtered = globalHistory.filter(h => h.completedMonth === targetMonthStr);
             if (filtered.length === 0) { emptyHistoryMessage.style.display = 'block'; return; }
             emptyHistoryMessage.style.display = 'none';
 
@@ -349,11 +353,12 @@
             filtered.forEach(h => {
                 const li = document.createElement('li'); li.className = 'task-item history-item';
                 const compDate = new Date(h.completedAt).toLocaleDateString('ja-JP');
+                const subInfo = subjects[h.subject] || { color: '#555', class: '' };
                 li.innerHTML = `
                     <div>
                         <div class="task-name" style="text-decoration: line-through; color: var(--text-muted);">${escapeHTML(h.name)}</div>
                         <div class="task-details">
-                            <span class="subject-badge" style="background-color: #555;">${h.subject}</span>
+                            <span class="subject-badge ${subInfo.class}" style="background-color: ${subInfo.color}">${h.subject}</span>
                             <span>当初締切: ${h.deadline}</span>
                             <div class="history-date">🗹 ${compDate} に完了</div>
                         </div>
@@ -363,16 +368,18 @@
             });
         }
 
-        // カレンダー描画（提出物と予定の両方を表示）
-        window.renderCalendar = function() {
-            const grid = document.getElementById('calendarGrid');
-            const title = document.getElementById('calendarTitle');
-            if(!grid || !title) return;
-            grid.innerHTML = '';
+        // 単一カレンダー生成の共通パーツ
+        function generateCalendarGrid(year, month, items, type) {
+            const container = document.createElement('div');
+            container.className = 'calendar-container';
             
-            const year = currentCalendarDate.getFullYear();
-            const month = currentCalendarDate.getMonth();
-            title.textContent = `${year}年 ${month + 1}月`;
+            const header = document.createElement('div');
+            header.className = 'calendar-header';
+            header.innerHTML = `<h3>${year}年 ${month + 1}月</h3>`;
+            container.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'calendar-grid';
 
             ['日', '月', '火', '水', '木', '金', '土'].forEach(d => {
                 const div = document.createElement('div'); div.className = 'calendar-day-head'; div.textContent = d; grid.appendChild(div);
@@ -384,27 +391,63 @@
 
             for (let day = 1; day <= numDays; day++) {
                 const cell = document.createElement('div'); cell.className = 'calendar-cell';
-                if (new Date().getFullYear() === year && new Date().getMonth() === month && new Date().getDate() === day) cell.classList.add('today');
+                const isToday = new Date().getFullYear() === year && new Date().getMonth() === month && new Date().getDate() === day;
+                if (isToday) cell.classList.add(type === 'task' ? 'today' : 'today-plan');
                 
                 const dayNumSpan = document.createElement('span'); dayNumSpan.className = 'day-num'; dayNumSpan.textContent = day; cell.appendChild(dayNumSpan);
                 const thisDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-                // 提出物を表示
-                globalTasks.filter(t => t.deadline === thisDateStr).forEach(t => {
-                    const subInfo = subjects[t.subject] || { color: '#fff', class: '' };
-                    const dot = document.createElement('div'); dot.className = `cal-item-dot ${subInfo.class}`; dot.style.backgroundColor = subInfo.color; dot.textContent = `📝${t.name}`; cell.appendChild(dot);
+                items.filter(item => item.deadline === thisDateStr).forEach(item => {
+                    const subInfo = subjects[item.subject] || { color: '#fff', class: '' };
+                    const dot = document.createElement('div'); dot.className = `cal-item-dot ${subInfo.class}`; dot.style.backgroundColor = subInfo.color; 
+                    dot.textContent = `${type === 'task' ? '📝' : '📅'}${item.name}`; 
+                    cell.appendChild(dot);
                 });
-
-                // 予定を表示
-                globalPlans.filter(p => p.deadline === thisDateStr).forEach(p => {
-                    const dot = document.createElement('div'); dot.className = 'cal-item-dot'; dot.style.backgroundColor = '#9c27b0'; dot.textContent = `📅${p.name}`; cell.appendChild(dot);
-                });
-                
                 grid.appendChild(cell);
             }
+            container.appendChild(grid);
+            return container;
+        }
+
+        // 提出物専用カレンダーの描画 (1ヶ月表示)
+        window.renderTaskCalendar = function() {
+            const box = document.getElementById('taskCalendarBox');
+            if(!box) return;
+            box.innerHTML = '';
+            
+            const year = taskCalendarDate.getFullYear();
+            const month = taskCalendarDate.getMonth();
+            const calGrid = generateCalendarGrid(year, month, globalTasks, 'task');
+            box.appendChild(calGrid);
+            renderHistory(); // カレンダー描画と一緒に履歴も連動更新
         };
 
-        window.changeMonth = function(offset) { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + offset); renderCalendar(); };
+        // 予定表専用カレンダーの描画 (2ヶ月分並べて表示)
+        window.renderPlanCalendar = function() {
+            const box = document.getElementById('planCalendarBox');
+            if(!box) return;
+            box.innerHTML = '';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'two-months-grid';
+
+            // 1ヶ月目 (選択月)
+            const y1 = planCalendarDate.getFullYear();
+            const m1 = planCalendarDate.getMonth();
+            wrapper.appendChild(generateCalendarGrid(y1, m1, globalPlans, 'plan'));
+
+            // 2ヶ月目 (翌月)
+            const nextDate = new Date(y1, m1 + 1, 1);
+            const y2 = nextDate.getFullYear();
+            const m2 = nextDate.getMonth();
+            wrapper.appendChild(generateCalendarGrid(y2, m2, globalPlans, 'plan'));
+
+            box.appendChild(wrapper);
+        };
+
+        window.changeTaskMonth = function(offset) { taskCalendarDate.setMonth(taskCalendarDate.getMonth() + offset); renderTaskCalendar(); };
+        window.changePlanMonth = function(offset) { planCalendarDate.setMonth(planCalendarDate.getMonth() + offset); renderPlanCalendar(); };
+
         window.switchPage = function(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
@@ -415,7 +458,8 @@
             if(pageId === 'page3') btnIdx = 2;
             document.querySelectorAll('.tabs .tab-btn')[btnIdx].classList.add('active');
             
-            if(pageId === 'page2' || pageId === 'page3') { renderCalendar(); renderTasks(); renderPlans(); renderHistory(); }
+            if(pageId === 'page2') { renderTaskCalendar(); renderTasks(); }
+            if(pageId === 'page3') { renderPlanCalendar(); renderPlans(); }
         };
         function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
     </script>
@@ -426,13 +470,11 @@
     <div class="tabs">
         <button class="tab-btn active" onclick="switchPage('page1')">1. 登録画面</button>
         <button class="tab-btn" onclick="switchPage('page2')">2. 提出物一覧・カレンダー</button>
-        <button class="tab-btn" onclick="switchPage('page3')">3. 予定表・テスト一覧</button>
+        <button class="tab-btn plan-tab-btn" onclick="switchPage('page3')">3. 予定表・テスト一覧</button>
     </div>
 
-    <!-- ページ1: 登録 -->
     <div id="page1" class="page active">
         <div class="form-flex">
-            <!-- 提出物登録ボックス -->
             <div class="form-card">
                 <h3>📝 提出物の登録</h3>
                 <div class="form-group">
@@ -456,18 +498,21 @@
                 <button class="submit-btn" onclick="addTask()">締め切りを追加する</button>
             </div>
 
-            <!-- 予定表登録ボックス -->
-            <div class="form-card" style="border-color: #9c27b0;">
-                <h3 style="color: #e040fb; border-color: #9c27b0;">📅 予定・テストの登録</h3>
+            <div class="form-card" style="border-color: var(--plan-color);">
+                <h3 style="color: #e040fb; border-color: var(--plan-color);">📅 予定・テストの登録</h3>
                 <div class="form-group">
                     <label for="planName">予定・テストの名前</label>
                     <input type="text" id="planName" placeholder="例：中間テスト、漢字検定、三者面談">
                 </div>
                 <div class="form-group">
+                    <label for="planSubject">科目・ジャンル</label>
+                    <select id="planSubject"></select>
+                </div>
+                <div class="form-group">
                     <label>予定日</label>
                     <div class="date-row">
                         <select id="planYearSelect" onchange="saveYearPreference()">
-                            <option value="2026">2026年</option> <option value="2027">2027年</option>
+                            <option value="2026">2026年all</option> <option value="2027">2027年</option>
                             <option value="2028">2028年</option> <option value="2029">2029年</option>
                         </select>
                         <input type="date" id="planMonthDay">
@@ -478,38 +523,39 @@
         </div>
     </div>
 
-    <!-- ページ2: 提出物カレンダー -->
     <div id="page2" class="page">
         <h2>📋 提出物締め切り一覧（日付順）</h2>
         <ul id="taskList" class="task-list"></ul>
         <div id="emptyMessage" class="empty-message">登録された締め切りはありません。</div>
         
-        <h2>📅 共通カレンダー</h2>
-        <div class="calendar-container">
-            <div class="calendar-header">
-                <button class="tab-btn" onclick="changeMonth(-1)">◀ 前の月</button>
-                <h3 id="calendarTitle"></h3>
-                <button class="tab-btn" onclick="changeMonth(1)">次の月 ▶</button>
-            </div>
-            <div class="calendar-grid" id="calendarGrid"></div>
+        <h2>📅 提出物カレンダー</h2>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <button class="tab-btn" onclick="changeTaskMonth(-1)">◀ 前の月</button>
+            <button class="tab-btn" onclick="changeTaskMonth(1)">次の月 ▶</button>
         </div>
+        <div id="taskCalendarBox"></div>
 
-        <!-- 完了済みタスクエリア -->
         <div class="archive-container">
             <div class="archive-header">
                 <h3 style="margin: 0; color: var(--success-color);">✅ 完了済みのタスク</h3>
-                <select id="archiveMonthFilter" class="archive-select"></select>
+                <div id="historyMonthTitle" class="archive-title-date"></div>
             </div>
             <ul id="historyList" class="task-list" style="margin-bottom: 0;"></ul>
             <div id="emptyHistoryMessage" class="empty-message" style="padding: 10px;">この月に完了したタスクはありません。</div>
         </div>
     </div>
 
-    <!-- ページ3: 予定表一覧 -->
     <div id="page3" class="page">
         <h2>📆 予定・テストスケジュール（日付順）</h2>
         <ul id="planList" class="task-list"></ul>
         <div id="emptyPlanMessage" class="empty-message">登録された予定はありません。</div>
+
+        <h2>🗓️ 予定カレンダー (2ヶ月分表示)</h2>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <button class="tab-btn" style="background-color: var(--plan-color);" onclick="changePlanMonth(-1)">◀ 前の月</button>
+            <button class="tab-btn" style="background-color: var(--plan-color);" onclick="changePlanMonth(1)">次の月 ▶</button>
+        </div>
+        <div id="planCalendarBox"></div>
     </div>
 </div>
 </body>
