@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>提出物 締め切り管理アプリ (安定版)</title>
+    <title>提出物 締め切り管理アプリ (自動同期版)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -83,17 +83,211 @@
         .cal-task-dot.bg-white { color: #000; }
         .empty-message { text-align: center; color: var(--text-muted); padding: 20px; }
     </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // 提供されたRealtime Databaseの正確なURLを設定済み
+        const firebaseConfig = {
+            apiKey: "AIzaSyC_7gj8hpablW97fm0sNJtaG6HUb3SQ1r8",
+            authDomain: "my-deadline-in-school-app.firebaseapp.com",
+            databaseURL: "https://my-deadline-in-school-app-default-rtdb.firebaseio.com/",
+            projectId: "my-deadline-in-school-app",
+            storageBucket: "my-deadline-in-school-app.firebasestorage.app",
+            messagingSenderId: "574584419324",
+            appId: "1:574584419324:web:29f6d30895978ec9aaf879"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const currentUsername = "my_shared_school_data_room";
+        let globalTasks = [];
+        let currentCalendarDate = new Date();
+
+        const subjects = {
+            '数学Ⅰ': { color: '#0055ff', class: '' }, '数学A': { color: '#000080', class: '' },
+            '言語文化': { color: '#ff0000', class: '' }, '現代の国語': { color: '#ff8888', class: '' },
+            '英語コミュニケーション': { color: '#ffa500', class: '' }, '英語論理表現': { color: '#ff4500', class: '' },
+            '地理': { color: '#90ee90', class: '' }, '科学': { color: '#800080', class: '' },
+            '歴史': { color: '#8b4513', class: '' }, '生物': { color: '#008000', class: '' },
+            '物理': { color: '#808080', class: '' }, 'その他': { color: '#ffffff', class: 'bg-white' }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initSubjectSelect();
+            loadYearPreference();
+            setDefaultMonthDay();
+            
+            // データベースからデータをリアルタイムに自動同期
+            const dbRef = ref(db, 'tasks/' + currentUsername);
+            onValue(dbRef, (snapshot) => {
+                globalTasks = [];
+                const data = snapshot.val();
+                if (data) {
+                    Object.keys(data).forEach((key) => {
+                        let task = data[key];
+                        task.databaseId = key;
+                        globalTasks.push(task);
+                    });
+                }
+                renderTasks();
+                renderCalendar();
+            }, (error) => {
+                console.error("データ同期エラー:", error);
+            });
+        });
+
+        function initSubjectSelect() {
+            const select = document.getElementById('taskSubject');
+            select.innerHTML = "";
+            for (let sub in subjects) {
+                let opt = document.createElement('option');
+                opt.value = sub; opt.textContent = sub; select.appendChild(opt);
+            }
+        }
+
+        window.saveYearPreference = function() {
+            localStorage.setItem('preferredYear', document.getElementById('yearSelect').value);
+        };
+        function loadYearPreference() {
+            const savedYear = localStorage.getItem('preferredYear');
+            if (savedYear) document.getElementById('yearSelect').value = savedYear;
+        }
+        function setDefaultMonthDay() {
+            const today = new Date();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            document.getElementById('taskMonthDay').value = `${today.getFullYear()}-${month}-${day}`;
+        }
+
+        window.addTask = function() {
+            const name = document.getElementById('taskName').value;
+            const subject = document.getElementById('taskSubject').value;
+            const year = document.getElementById('yearSelect').value;
+            const monthDay = document.getElementById('taskMonthDay').value;
+
+            if (!name || !monthDay) { alert('入力してください！'); return; }
+
+            const dateParts = monthDay.split('-');
+            const finalDeadline = `${year}-${dateParts[1]}-${dateParts[2]}`;
+
+            try {
+                const dbRef = ref(db, 'tasks/' + currentUsername);
+                const newTaskRef = push(dbRef);
+                set(newTaskRef, {
+                    name: name,
+                    subject: subject,
+                    deadline: finalDeadline,
+                    createdAt: Date.now()
+                });
+                document.getElementById('taskName').value = '';
+                switchPage('page2');
+            } catch (e) {
+                alert('同期保存に失敗しました。データベースのルール設定を確認してください。');
+                console.error(e);
+            }
+        };
+
+        window.deleteTask = function(databaseId) {
+            if (confirm('完了にしますか？（すべての端末から消去されます）')) {
+                const itemRef = ref(db, 'tasks/' + currentUsername + '/' + databaseId);
+                remove(itemRef);
+            }
+        };
+
+        function getDaysLeftClassAndText(deadlineStr) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const deadline = new Date(deadlineStr); deadline.setHours(0,0,0,0);
+            const diffDays = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) return { class: 'days-1', text: `期限超過` };
+            if (diffDays === 0) return { class: 'days-1', text: '今日！' };
+            if (diffDays === 1) return { class: 'days-1', text: '残り1日' };
+            if (diffDays === 2) return { class: 'days-2', text: '残り2日' };
+            if (diffDays === 3) return { class: 'days-3', text: '残り3日' };
+            if (diffDays === 4) return { class: 'days-4', text: '残り4日' };
+            if (diffDays >= 5 && diffDays < 10) return { class: 'days-5', text: `残り${diffDays}日` };
+            return { class: 'days-10', text: `残り${diffDays}日` };
+        }
+
+        function renderTasks() {
+            const taskList = document.getElementById('taskList');
+            const emptyMessage = document.getElementById('emptyMessage');
+            taskList.innerHTML = '';
+            if (globalTasks.length === 0) { emptyMessage.style.display = 'block'; return; }
+            emptyMessage.style.display = 'none';
+
+            globalTasks.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+            globalTasks.forEach(task => {
+                const li = document.createElement('li'); li.className = 'task-item';
+                const subInfo = subjects[task.subject] || { color: '#fff', class: '' };
+                li.style.borderLeftColor = subInfo.color;
+                const daysInfo = getDaysLeftClassAndText(task.deadline);
+                li.innerHTML = `
+                    <div>
+                        <div class="task-name">${escapeHTML(task.name)}</div>
+                        <div class="task-details">
+                            <span class="subject-badge ${subInfo.class}" style="background-color: ${subInfo.color}">${task.subject}</span>
+                            <span>締切: ${task.deadline} </span>
+                            <span class="days-left ${daysInfo.class}">(${daysInfo.text})</span>
+                        </div>
+                    </div>
+                    <button class="complete-btn" onclick="deleteTask('${task.databaseId}')">完了</button>
+                `;
+                taskList.appendChild(li);
+            });
+        }
+
+        window.renderCalendar = function() {
+            const grid = document.getElementById('calendarGrid');
+            const title = document.getElementById('calendarTitle');
+            grid.innerHTML = '';
+            const year = currentCalendarDate.getFullYear();
+            const month = currentCalendarDate.getMonth();
+            title.textContent = `${year}年 ${month + 1}月`;
+
+            ['日', '月', '火', '水', '木', '金', '土'].forEach(d => {
+                const div = document.createElement('div'); div.className = 'calendar-day-head'; div.textContent = d; grid.appendChild(div);
+            });
+
+            const firstDayIdx = new Date(year, month, 1).getDay();
+            const numDays = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < firstDayIdx; i++) grid.appendChild(document.createElement('div'));
+
+            for (let day = 1; day <= numDays; day++) {
+                const cell = document.createElement('div'); cell.className = 'calendar-cell';
+                if (new Date().getFullYear() === year && new Date().getMonth() === month && new Date().getDate() === day) cell.classList.add('today');
+                const dayNumSpan = document.createElement('span'); dayNumSpan.className = 'day-num'; dayNumSpan.textContent = day; cell.appendChild(dayNumSpan);
+
+                const thisDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                globalTasks.filter(t => t.deadline === thisDateStr).forEach(t => {
+                    const subInfo = subjects[t.subject] || { color: '#fff', class: '' };
+                    const dot = document.createElement('div'); dot.className = `cal-task-dot ${subInfo.class}`; dot.style.backgroundColor = subInfo.color; dot.textContent = t.name; cell.appendChild(dot);
+                });
+                grid.appendChild(cell);
+            }
+        };
+
+        window.changeMonth = function(offset) { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + offset); renderCalendar(); };
+        window.switchPage = function(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            const btnIdx = pageId === 'page1' ? 0 : 1;
+            document.querySelectorAll('.tabs .tab-btn')[btnIdx].classList.add('active');
+            if(pageId === 'page2') { renderTasks(); renderCalendar(); }
+        };
+        function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
+    </script>
 </head>
 <body>
-
 <div class="container">
     <h1>📅 提出物管理システム</h1>
-
     <div class="tabs">
         <button class="tab-btn active" onclick="switchPage('page1')">1. 締め切り登録</button>
         <button class="tab-btn" onclick="switchPage('page2')">2. 一覧・カレンダー</button>
     </div>
-
     <div id="page1" class="page active">
         <h2>提出物の登録</h2>
         <div class="form-card">
@@ -120,12 +314,10 @@
             <button class="submit-btn" onclick="addTask()">締め切りを追加する</button>
         </div>
     </div>
-
     <div id="page2" class="page">
         <h2>締め切り一覧（日付順）</h2>
         <ul id="taskList" class="task-list"></ul>
         <div id="emptyMessage" class="empty-message">登録された締め切りはありません。</div>
-
         <h2>カレンダー表示</h2>
         <div class="calendar-container">
             <div class="calendar-header">
@@ -137,175 +329,5 @@
         </div>
     </div>
 </div>
-
-<script>
-    const subjects = {
-        '数学Ⅰ': { color: '#0055ff', class: '' },
-        '数学A': { color: '#000080', class: '' },
-        '言語文化': { color: '#ff0000', class: '' },
-        '現代の国語': { color: '#ff8888', class: '' },
-        '英語コミュニケーション': { color: '#ffa500', class: '' },
-        '英語論理表現': { color: '#ff4500', class: '' },
-        '地理': { color: '#90ee90', class: '' },
-        '科学': { color: '#800080', class: '' },
-        '歴史': { color: '#8b4513', class: '' },
-        '生物': { color: '#008000', class: '' },
-        '物理': { color: '#808080', class: '' },
-        'その他': { color: '#ffffff', class: 'bg-white' }
-    };
-
-    let currentCalendarDate = new Date();
-
-    document.addEventListener('DOMContentLoaded', () => {
-        initSubjectSelect();
-        loadYearPreference();
-        setDefaultMonthDay();
-        renderTasks();
-        renderCalendar();
-    });
-
-    function switchPage(pageId) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        event.target.classList.add('active');
-        if(pageId === 'page2') { renderTasks(); renderCalendar(); }
-    }
-
-    function initSubjectSelect() {
-        const select = document.getElementById('taskSubject');
-        for (let sub in subjects) {
-            let opt = document.createElement('option');
-            opt.value = sub; opt.textContent = sub; select.appendChild(opt);
-        }
-    }
-
-    function saveYearPreference() { localStorage.setItem('preferredYear', document.getElementById('yearSelect').value); }
-    function loadYearPreference() {
-        const savedYear = localStorage.getItem('preferredYear');
-        if (savedYear) document.getElementById('yearSelect').value = savedYear;
-    }
-
-    function setDefaultMonthDay() {
-        const today = new Date();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        document.getElementById('taskMonthDay').value = `${today.getFullYear()}-${month}-${day}`;
-    }
-
-    function addTask() {
-        const name = document.getElementById('taskName').value;
-        const subject = document.getElementById('taskSubject').value;
-        const year = document.getElementById('yearSelect').value;
-        const monthDay = document.getElementById('taskMonthDay').value;
-
-        if (!name || !monthDay) { alert('入力してください！'); return; }
-
-        const dateParts = monthDay.split('-');
-        const finalDeadline = `${year}-${dateParts[1]}-${dateParts[2]}`;
-
-        const task = { id: Date.now(), name: name, subject: subject, deadline: finalDeadline };
-        let tasks = JSON.parse(localStorage.getItem('stableDeadlines')) || [];
-        tasks.push(task);
-        localStorage.setItem('stableDeadlines', JSON.stringify(tasks));
-
-        alert('締め切りを追加しました！');
-        document.getElementById('taskName').value = '';
-        switchPage('page2');
-    }
-
-    function deleteTask(id) {
-        if (confirm('本当に完了にしますか？')) {
-            let tasks = JSON.parse(localStorage.getItem('stableDeadlines')) || [];
-            tasks = tasks.filter(t => t.id !== id);
-            localStorage.setItem('stableDeadlines', JSON.stringify(tasks));
-            renderTasks(); renderCalendar();
-        }
-    }
-
-    function getDaysLeftClassAndText(deadlineStr) {
-        const today = new Date(); today.setHours(0,0,0,0);
-        const deadline = new Date(deadlineStr); deadline.setHours(0,0,0,0);
-        const diffDays = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0) return { class: 'days-1', text: `期限超過` };
-        if (diffDays === 0) return { class: 'days-1', text: '今日！' };
-        if (diffDays === 1) return { class: 'days-1', text: '残り1日' };
-        if (diffDays === 2) return { class: 'days-2', text: '残り2日' };
-        if (diffDays === 3) return { class: 'days-3', text: '残り3日' };
-        if (diffDays === 4) return { class: 'days-4', text: '残り4日' };
-        if (diffDays >= 5 && diffDays < 10) return { class: 'days-5', text: `残り${diffDays}日` };
-        return { class: 'days-10', text: `残り${diffDays}日` };
-    }
-
-    function renderTasks() {
-        const taskList = document.getElementById('taskList');
-        const emptyMessage = document.getElementById('emptyMessage');
-        const tasks = JSON.parse(localStorage.getItem('stableDeadlines')) || [];
-
-        taskList.innerHTML = '';
-        if (tasks.length === 0) { emptyMessage.style.display = 'block'; return; }
-        emptyMessage.style.display = 'none';
-
-        tasks.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-        tasks.forEach(task => {
-            const li = document.createElement('li');
-            li.className = 'task-item';
-            const subInfo = subjects[task.subject] || { color: '#fff', class: '' };
-            li.style.borderLeftColor = subInfo.color;
-            const daysInfo = getDaysLeftClassAndText(task.deadline);
-
-            li.innerHTML = `
-                <div>
-                    <div class="task-name">${escapeHTML(task.name)}</div>
-                    <div class="task-details">
-                        <span class="subject-badge ${subInfo.class}" style="background-color: ${subInfo.color}">${task.subject}</span>
-                        <span>締切: ${task.deadline} </span>
-                        <span class="days-left ${daysInfo.class}">(${daysInfo.text})</span>
-                    </div>
-                </div>
-                <button class="complete-btn" onclick="deleteTask(${task.id})">完了</button>
-            `;
-            taskList.appendChild(li);
-        });
-    }
-
-    function renderCalendar() {
-        const grid = document.getElementById('calendarGrid');
-        const title = document.getElementById('calendarTitle');
-        const tasks = JSON.parse(localStorage.getItem('stableDeadlines')) || [];
-        grid.innerHTML = '';
-
-        const year = currentCalendarDate.getFullYear();
-        const month = currentCalendarDate.getMonth();
-        title.textContent = `${year}年 ${month + 1}月`;
-
-        ['日', '月', '火', '水', '木', '金', '土'].forEach(d => {
-            const div = document.createElement('div'); div.className = 'calendar-day-head'; div.textContent = d; grid.appendChild(div);
-        });
-
-        const firstDayIdx = new Date(year, month, 1).getDay();
-        const numDays = new Date(year, month + 1, 0).getDate();
-
-        for (let i = 0; i < firstDayIdx; i++) grid.appendChild(document.createElement('div'));
-
-        for (let day = 1; day <= numDays; day++) {
-            const cell = document.createElement('div'); cell.className = 'calendar-cell';
-            if (new Date().getFullYear() === year && new Date().getMonth() === month && new Date().getDate() === day) cell.classList.add('today');
-
-            const dayNumSpan = document.createElement('span'); dayNumSpan.className = 'day-num'; dayNumSpan.textContent = day; cell.appendChild(dayNumSpan);
-
-            const thisDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            tasks.filter(t => t.deadline === thisDateStr).forEach(t => {
-                const subInfo = subjects[t.subject] || { color: '#fff', class: '' };
-                const dot = document.createElement('div'); dot.className = `cal-task-dot ${subInfo.class}`; dot.style.backgroundColor = subInfo.color; dot.textContent = t.name; cell.appendChild(dot);
-            });
-            grid.appendChild(cell);
-        }
-    }
-
-    function changeMonth(offset) { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + offset); renderCalendar(); }
-    function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
-</script>
 </body>
 </html>
