@@ -16,6 +16,7 @@
             --success-color: #4caf50;
             --danger-color: #f44336;
             --plan-color: #9c27b0;
+            --highlight-color: #ffeb3b;
         }
 
         body {
@@ -28,7 +29,7 @@
             justify-content: center;
         }
 
-        .container { width: 100%; max-width: 900px; }
+        .container { width: 100%; max-width: 950px; }
         h1, h2, h3 { text-align: center; color: #ffffff; }
 
         .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
@@ -39,6 +40,7 @@
         }
         .tab-btn.active { background-color: var(--primary-button); color: #fff; border-color: var(--primary-button); }
         .tab-btn.plan-tab-btn.active { background-color: var(--plan-color); border-color: var(--plan-color); }
+        .tab-btn.timetable-tab-btn.active { background-color: #e91e63; border-color: #e91e63; }
 
         .page { display: none; }
         .page.active { display: block; }
@@ -82,20 +84,30 @@
         .action-btn.comp:hover { background-color: var(--success-color); color: #fff; }
         .action-btn.del:hover { background-color: var(--danger-color); color: #fff; }
 
-        .calendar-container { background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 30px; }
+        /* カレンダー・詳細表示 */
+        .calendar-container { background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px; }
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 10fr); gap: 5px; text-align: center; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
         .calendar-day-head { font-weight: bold; padding: 5px; color: var(--text-muted); }
-        .calendar-cell { background: var(--input-bg); min-height: 75px; border-radius: 4px; padding: 4px; font-size: 12px; display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; }
+        .calendar-cell { background: var(--input-bg); min-height: 75px; border-radius: 4px; padding: 4px; font-size: 12px; display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; cursor: pointer; transition: background 0.2s; }
+        .calendar-cell:hover { background: #3a3a3a; }
         .calendar-cell .day-num { font-weight: bold; margin-bottom: 3px; }
         .calendar-cell.today { border: 2px solid var(--primary-button); }
         .calendar-cell.today-plan { border: 2px solid var(--plan-color); }
+        .calendar-cell.selected-day { background: #334e68; border: 2px solid var(--highlight-color); }
         
         .cal-item-dot { width: 92%; font-size: 10px; padding: 1px 3px; border-radius: 2px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; text-align: left; }
         .cal-item-dot.bg-white { color: #000; }
 
         .two-months-grid { display: flex; flex-direction: column; gap: 20px; }
         @media (min-width: 768px) { .two-months-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } }
+
+        /* ポップアップ詳細エリア */
+        .detail-view-card { background: #1e293b; border: 2px solid var(--primary-button); padding: 15px; border-radius: 12px; margin-bottom: 25px; }
+        .detail-view-card.plan-detail { border-color: var(--plan-color); }
+        .detail-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px; color: #fff; display: flex; justify-content: space-between; }
+        .detail-items-container { display: flex; flex-direction: column; gap: 8px; }
+        .detail-row-item { background: #0f172a; padding: 10px; border-radius: 6px; display: flex; align-items: center; border-left: 6px solid #fff; }
 
         .archive-container { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid #2a2a2a; margin-top: 20px; }
         .archive-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; }
@@ -105,6 +117,17 @@
         .history-date { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
         .empty-message { text-align: center; color: var(--text-muted); padding: 20px; }
+
+        /* 時間割用のスタイル */
+        .timetable-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; padding: 10px; }
+        .timetable-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: fixed; }
+        .timetable-table th, .timetable-table td { border: 1px solid var(--border-color); padding: 8px 4px; vertical-align: top; }
+        .timetable-table th { background-color: var(--input-bg); color: #ffffff; font-weight: bold; font-size: 15px; }
+        .period-col { width: 45px; background-color: var(--input-bg); font-weight: bold; font-size: 16px; vertical-align: middle !important; }
+        .cell-box { display: flex; flex-direction: column; gap: 4px; align-items: center; min-height: 75px; justify-content: center; }
+        .cell-subject { font-weight: bold; font-size: 14px; line-height: 1.2; word-break: break-all; width: 100%; padding: 2px 0; border-radius: 4px; }
+        .cell-teacher { font-size: 11px; color: var(--text-muted); }
+        .cell-room { font-size: 11px; color: #41b883; font-weight: bold; }
     </style>
 
     <script type="module">
@@ -130,20 +153,28 @@
         let globalHistory = [];
         let taskCalendarDate = new Date();
         let planCalendarDate = new Date();
+        let selectedTaskDateStr = "";
+        let selectedPlanDateStr = "";
 
         const subjects = {
+            '現代の国語': { color: '#ff8888', class: '' }, '言語文化': { color: '#ff0000', class: '' },
+            '論理表現Ⅰ': { color: '#ff4500', class: '' }, '英語コミュニ': { color: '#ffa500', class: '' },
             '数学Ⅰ': { color: '#0055ff', class: '' }, '数学A': { color: '#000080', class: '' },
-            '言語文化': { color: '#ff0000', class: '' }, '現代の国語': { color: '#ff8888', class: '' },
-            '英語コミュニケーション': { color: '#ffa500', class: '' }, '英語論理表現': { color: '#ff4500', class: '' },
-            '地理': { color: '#90ee90', class: '' }, '科学': { color: '#800080', class: '' },
-            '歴史': { color: '#8b4513', class: '' }, '生物': { color: '#008000', class: '' },
-            '物理': { color: '#808080', class: '' }, 'その他': { color: '#ffffff', class: 'bg-white' }
+            '物理基礎': { color: '#808080', class: '' }, '化学基礎': { color: '#800080', class: '' }, '生物基礎': { color: '#008000', class: '' },
+            '歴史総合': { color: '#8b4513', class: '' }, '地理総合': { color: '#90ee90', class: '' },
+            '家庭基礎': { color: '#e91e63', class: '' }, '情報Ⅰ': { color: '#00bcd4', class: '' }, 
+            '体育': { color: '#4caf50', class: '' }, '保健': { color: '#3f51b5', class: '' },
+            '柔体': { color: '#607d8b', class: '' }, '体柔': { color: '#607d8b', class: '' },
+            '1Tス音': { color: '#ffeb3b', class: 'bg-white' }, '1T美': { color: '#ffeb3b', class: 'bg-white' }, 
+            'LHR': { color: '#795548', class: '' }, '高1ST総探': { color: '#9e9e9e', class: '' },
+            'その他': { color: '#ffffff', class: 'bg-white' }
         };
 
         document.addEventListener('DOMContentLoaded', () => {
             initSubjectSelects();
             loadYearPreference();
             setDefaultMonthDay();
+            initTimetableStyles();
             
             // 提出物データの同期
             onValue(ref(db, 'tasks/' + currentUsername), (snapshot) => {
@@ -154,7 +185,7 @@
                         let item = data[key]; item.databaseId = key; globalTasks.push(item);
                     });
                 }
-                renderTasks(); renderTaskCalendar();
+                renderTasks(); renderTaskCalendar(); showDayDetail(selectedTaskDateStr, 'task');
             });
 
             // 予定表データの同期
@@ -166,7 +197,7 @@
                         let item = data[key]; item.databaseId = key; globalPlans.push(item);
                     });
                 }
-                renderPlans(); renderPlanCalendar();
+                renderPlans(); renderPlanCalendar(); showDayDetail(selectedPlanDateStr, 'plan');
             });
 
             // 完了済み履歴データの同期
@@ -209,9 +240,20 @@
             const dateStr = `${today.getFullYear()}-${month}-${day}`;
             document.getElementById('taskMonthDay').value = dateStr;
             document.getElementById('planMonthDay').value = dateStr;
+            selectedTaskDateStr = dateStr;
+            selectedPlanDateStr = dateStr;
         }
 
-        // 提出物の追加
+        // 時間割の教科セルに自動で色を設定する
+        function initTimetableStyles() {
+            document.querySelectorAll('.cell-subject').forEach(div => {
+                const txt = div.textContent.trim();
+                const subInfo = subjects[txt] || subjects['その他'];
+                div.style.backgroundColor = subInfo.color;
+                if(subInfo.class === 'bg-white') div.style.color = '#000';
+            });
+        }
+
         window.addTask = function() {
             const name = document.getElementById('taskName').value;
             const subject = document.getElementById('taskSubject').value;
@@ -224,10 +266,10 @@
                 name: name, subject: subject, deadline: finalDeadline, createdAt: Date.now()
             });
             document.getElementById('taskName').value = '';
+            selectedTaskDateStr = finalDeadline;
             switchPage('page2');
         };
 
-        // 予定の追加
         window.addPlan = function() {
             const name = document.getElementById('planName').value;
             const subject = document.getElementById('planSubject').value;
@@ -240,10 +282,10 @@
                 name: name, subject: subject, deadline: finalDeadline, createdAt: Date.now()
             });
             document.getElementById('planName').value = '';
+            selectedPlanDateStr = finalDeadline;
             switchPage('page3');
         };
 
-        // タスクを完了にする
         window.completeTask = function(databaseId, name, subject, deadline) {
             if (confirm('完了にしますか？（完了済みリストに移動します）')) {
                 const now = new Date();
@@ -255,7 +297,6 @@
             }
         };
 
-        // 予定の削除
         window.deletePlan = function(databaseId) {
             if (confirm('この予定を削除しますか？')) {
                 remove(ref(db, 'plans/' + currentUsername + '/' + databaseId));
@@ -276,10 +317,10 @@
             return { class: 'days-10', text: `残り${diffDays}日` };
         }
 
-        // 提出物一覧の描画
         function renderTasks() {
             const taskList = document.getElementById('taskList');
             const emptyMessage = document.getElementById('emptyMessage');
+            if(!taskList) return;
             taskList.innerHTML = '';
             if (globalTasks.length === 0) { emptyMessage.style.display = 'block'; return; }
             emptyMessage.style.display = 'none';
@@ -305,10 +346,10 @@
             });
         }
 
-        // 予定表一覧の描画
         function renderPlans() {
             const planList = document.getElementById('planList');
             const emptyPlanMessage = document.getElementById('emptyPlanMessage');
+            if(!planList) return;
             planList.innerHTML = '';
             if (globalPlans.length === 0) { emptyPlanMessage.style.display = 'block'; return; }
             emptyPlanMessage.style.display = 'none';
@@ -334,7 +375,6 @@
             });
         }
 
-        // 完了済み履歴の描画（カレンダーの月移動と100%自動連動）
         function renderHistory() {
             const historyList = document.getElementById('historyList');
             const emptyHistoryMessage = document.getElementById('emptyHistoryMessage');
@@ -368,7 +408,58 @@
             });
         }
 
-        // 単一カレンダー生成の共通パーツ
+        // タップした日の詳細をデカデカと表示する機能
+        window.clickDayCell = function(dateStr, type) {
+            if(type === 'task') { selectedTaskDateStr = dateStr; renderTaskCalendar(); showDayDetail(dateStr, 'task'); }
+            else { selectedPlanDateStr = dateStr; renderPlanCalendar(); showDayDetail(dateStr, 'plan'); }
+        }
+
+        function showDayDetail(dateStr, type) {
+            const displayId = type === 'task' ? 'taskDayDetailDisplay' : 'planDayDetailDisplay';
+            const container = document.getElementById(displayId);
+            if(!container) return;
+
+            container.innerHTML = "";
+            if(!dateStr) return;
+
+            const targetItems = type === 'task' 
+                ? globalTasks.filter(t => t.deadline === dateStr)
+                : globalPlans.filter(p => p.deadline === dateStr);
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = "detail-title";
+            titleDiv.innerHTML = `<span>🔍 ${dateStr} の詳細表示</span> <span>🔍 タップで拡大中</span>`;
+            container.appendChild(titleDiv);
+
+            const listWrapper = document.createElement('div');
+            listWrapper.className = "detail-items-container";
+
+            if(targetItems.length === 0) {
+                listWrapper.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px;">この日の登録はありません。</div>`;
+            } else {
+                targetItems.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = "detail-row-item";
+                    const subInfo = subjects[item.subject] || { color: '#fff', class: '' };
+                    row.style.borderLeftColor = subInfo.color;
+                    
+                    const daysInfo = getDaysLeftClassAndText(item.deadline);
+                    row.innerHTML = `
+                        <div style="flex-grow:1;">
+                            <div style="font-weight:bold; font-size:18px; color:#fff;">${escapeHTML(item.name)}</div>
+                            <div style="font-size:13px; margin-top:4px; color:var(--text-muted);">
+                                <span class="subject-badge ${subInfo.class}" style="background-color: ${subInfo.color}">${item.subject}</span>
+                                <span class="${daysInfo.class}" style="font-weight:bold;">(${daysInfo.text})</span>
+                            </div>
+                        </div>
+                    `;
+                    listWrapper.appendChild(row);
+                });
+            }
+            container.appendChild(listWrapper);
+        }
+
+        // 単一カレンダー生成パーツ（タップイベント連動）
         function generateCalendarGrid(year, month, items, type) {
             const container = document.createElement('div');
             container.className = 'calendar-container';
@@ -389,13 +480,19 @@
             const numDays = new Date(year, month + 1, 0).getDate();
             for (let i = 0; i < firstDayIdx; i++) grid.appendChild(document.createElement('div'));
 
+            const selectedDateStr = type === 'task' ? selectedTaskDateStr : selectedPlanDateStr;
+
             for (let day = 1; day <= numDays; day++) {
                 const cell = document.createElement('div'); cell.className = 'calendar-cell';
+                const thisDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                cell.setAttribute('onclick', `clickDayCell('${thisDateStr}', '${type}')`);
+                
                 const isToday = new Date().getFullYear() === year && new Date().getMonth() === month && new Date().getDate() === day;
                 if (isToday) cell.classList.add(type === 'task' ? 'today' : 'today-plan');
+                if (thisDateStr === selectedDateStr) cell.classList.add('selected-day');
                 
                 const dayNumSpan = document.createElement('span'); dayNumSpan.className = 'day-num'; dayNumSpan.textContent = day; cell.appendChild(dayNumSpan);
-                const thisDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
                 items.filter(item => item.deadline === thisDateStr).forEach(item => {
                     const subInfo = subjects[item.subject] || { color: '#fff', class: '' };
@@ -409,39 +506,23 @@
             return container;
         }
 
-        // 提出物専用カレンダーの描画 (1ヶ月表示)
         window.renderTaskCalendar = function() {
             const box = document.getElementById('taskCalendarBox');
-            if(!box) return;
-            box.innerHTML = '';
-            
-            const year = taskCalendarDate.getFullYear();
-            const month = taskCalendarDate.getMonth();
-            const calGrid = generateCalendarGrid(year, month, globalTasks, 'task');
-            box.appendChild(calGrid);
-            renderHistory(); // カレンダー描画と一緒に履歴も連動更新
+            if(!box) return; box.innerHTML = '';
+            box.appendChild(generateCalendarGrid(taskCalendarDate.getFullYear(), taskCalendarDate.getMonth(), globalTasks, 'task'));
+            renderHistory();
         };
 
-        // 予定表専用カレンダーの描画 (2ヶ月分並べて表示)
         window.renderPlanCalendar = function() {
             const box = document.getElementById('planCalendarBox');
-            if(!box) return;
-            box.innerHTML = '';
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'two-months-grid';
-
-            // 1ヶ月目 (選択月)
-            const y1 = planCalendarDate.getFullYear();
-            const m1 = planCalendarDate.getMonth();
+            if(!box) return; box.innerHTML = '';
+            const wrapper = document.createElement('div'); wrapper.className = 'two-months-grid';
+            
+            const y1 = planCalendarDate.getFullYear(); const m1 = planCalendarDate.getMonth();
             wrapper.appendChild(generateCalendarGrid(y1, m1, globalPlans, 'plan'));
 
-            // 2ヶ月目 (翌月)
             const nextDate = new Date(y1, m1 + 1, 1);
-            const y2 = nextDate.getFullYear();
-            const m2 = nextDate.getMonth();
-            wrapper.appendChild(generateCalendarGrid(y2, m2, globalPlans, 'plan'));
-
+            wrapper.appendChild(generateCalendarGrid(nextDate.getFullYear(), nextDate.getMonth(), globalPlans, 'plan'));
             box.appendChild(wrapper);
         };
 
@@ -456,10 +537,11 @@
             let btnIdx = 0;
             if(pageId === 'page2') btnIdx = 1;
             if(pageId === 'page3') btnIdx = 2;
+            if(pageId === 'page4') btnIdx = 3;
             document.querySelectorAll('.tabs .tab-btn')[btnIdx].classList.add('active');
             
-            if(pageId === 'page2') { renderTaskCalendar(); renderTasks(); }
-            if(pageId === 'page3') { renderPlanCalendar(); renderPlans(); }
+            if(pageId === 'page2') { renderTaskCalendar(); renderTasks(); showDayDetail(selectedTaskDateStr, 'task'); }
+            if(pageId === 'page3') { renderPlanCalendar(); renderPlans(); showDayDetail(selectedPlanDateStr, 'plan'); }
         };
         function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
     </script>
@@ -471,6 +553,7 @@
         <button class="tab-btn active" onclick="switchPage('page1')">1. 登録画面</button>
         <button class="tab-btn" onclick="switchPage('page2')">2. 提出物一覧・カレンダー</button>
         <button class="tab-btn plan-tab-btn" onclick="switchPage('page3')">3. 予定表・テスト一覧</button>
+        <button class="tab-btn timetable-tab-btn" onclick="switchPage('page4')">4. 🏫 時間割</button>
     </div>
 
     <div id="page1" class="page active">
@@ -512,7 +595,7 @@
                     <label>予定日</label>
                     <div class="date-row">
                         <select id="planYearSelect" onchange="saveYearPreference()">
-                            <option value="2026">2026年all</option> <option value="2027">2027年</option>
+                            <option value="2026">2026年</option> <option value="2027">2027年</option>
                             <option value="2028">2028年</option> <option value="2029">2029年</option>
                         </select>
                         <input type="date" id="planMonthDay">
@@ -535,6 +618,8 @@
         </div>
         <div id="taskCalendarBox"></div>
 
+        <div id="taskDayDetailDisplay" class="detail-view-card"></div>
+
         <div class="archive-container">
             <div class="archive-header">
                 <h3 style="margin: 0; color: var(--success-color);">✅ 完了済みのタスク</h3>
@@ -556,6 +641,294 @@
             <button class="tab-btn" style="background-color: var(--plan-color);" onclick="changePlanMonth(1)">次の月 ▶</button>
         </div>
         <div id="planCalendarBox"></div>
+
+        <div id="planDayDetailDisplay" class="detail-view-card plan-detail"></div>
+    </div>
+
+    <div id="page4" class="page">
+        <h2>🏫 クラス時間割表</h2>
+        <div class="timetable-card">
+            <table class="timetable-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">校時</th>
+                        <th>月曜日</th>
+                        <th>火曜日</th>
+                        <th>水曜日</th>
+                        <th>木曜日</th>
+                        <th>金曜日</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="period-col">0</td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">現代の国語</div>
+                                <div class="cell-teacher">有馬</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">数学A</div>
+                                <div class="cell-teacher">山口</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">英語コミュニ</div>
+                                <div class="cell-teacher">ひとみ</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">化学基礎</div>
+                                <div class="cell-teacher">神谷</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">物理基礎</div>
+                                <div class="cell-teacher">番屋武</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="period-col">1</td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">物理基礎</div>
+                                <div class="cell-teacher">番屋武</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">言語文化</div>
+                                <div class="cell-teacher">有馬</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">1Tス音 / 1T美</div>
+                                <div class="cell-teacher">眞栄城 / 中音楽室</div>
+                                <div class="cell-room">1-5 / 音楽室</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">論理表現Ⅰ</div>
+                                <div class="cell-teacher">ひとみ</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">歴史総合</div>
+                                <div class="cell-teacher">宮里</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="period-col">2</td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">生物基礎</div>
+                                <div class="cell-teacher">小郷</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">家庭基礎</div>
+                                <div class="cell-teacher">真由美</div>
+                                <div class="cell-room">被服室</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">1Tス音 / 1T美</div>
+                                <div class="cell-teacher">眞栄城 / 中音楽室</div>
+                                <div class="cell-room">1-5 / 音楽室</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">歴史総合</div>
+                                <div class="cell-teacher">宮里</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">体育</div>
+                                <div class="cell-teacher">井上</div>
+                                <div class="cell-room">第1体育館</div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="period-col">3</td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">論理表現Ⅰ</div>
+                                <div class="cell-teacher">ひとみ</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">家庭基礎</div>
+                                <div class="cell-teacher">真由美</div>
+                                <div class="cell-room">被服室</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">言語文化</div>
+                                <div class="cell-teacher">有馬</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">現代の国語</div>
+                                <div class="cell-teacher">有馬</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">言語文化</div>
+                                <div class="cell-teacher">有馬</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="period-col">4</td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">化学基礎</div>
+                                <div class="cell-teacher">神谷</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">英語コミュニ</div>
+                                <div class="cell-teacher">ひとみ</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">体柔 / 体</div>
+                                <div class="cell-teacher">普隆</div>
+                                <div class="cell-room">第1体育館</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">地理総合</div>
+                                <div class="cell-teacher">健夫</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">英語コミュニ</div>
+                                <div class="cell-teacher">ひとみ</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="period-col">5</td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">地理総合</div>
+                                class="cell-teacher">健夫</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">柔体 / 体</div>
+                                <div class="cell-teacher">将刀</div>
+                                <div class="cell-room">第1体育館</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">数学Ⅰ</div>
+                                <div class="cell-teacher">山口</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">保健</div>
+                                <div class="cell-teacher">洋疾</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">生物基礎</div>
+                                <div class="cell-teacher">小郷</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="period-col">6</td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">数学Ⅰ</div>
+                                <div class="cell-teacher">山口</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">高1ST総探</div>
+                                <div class="cell-teacher">山口</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">LHR</div>
+                                <div class="cell-teacher">山口</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">数学A</div>
+                                <div class="cell-teacher">山口</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-box">
+                                <div class="cell-subject">数学Ⅰ</div>
+                                <div class="cell-teacher">山口</div>
+                                <div class="cell-room">1-5</div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 </body>
