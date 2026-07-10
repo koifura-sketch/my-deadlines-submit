@@ -128,6 +128,7 @@
         .cell-room { font-size: 11px; color: #41b883; font-weight: bold; }
     </style>
 
+    <!-- Firebaseシステム -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -154,16 +155,27 @@
         let selectedTaskDateStr = "";
         let selectedPlanDateStr = "";
 
+        // 教科のカラー定義（ご指定通りのカラー）
         const subjects = {
-            '現代の国語': { color: '#ff8888' }, '言語文化': { color: '#ff0000' },
-            '論理表現Ⅰ': { color: '#ff4500' }, '英語コミュニ': { color: '#ffa500' },
-            '数学Ⅰ': { color: '#0055ff' }, '数学A': { color: '#000080' },
-            '物理基礎': { color: '#808080' }, '化学基礎': { color: '#800080' }, '生物基礎': { color: '#008000' },
-            '歴史総合': { color: '#8b4513' }, '地理総合': { color: '#90ee90' },
-            '家庭基礎': { color: '#e91e63' }, '情報Ⅰ': { color: '#00bcd4' }, 
-            '体育': { color: '#4caf50' }, '保健': { color: '#3f51b5' },
-            '柔体': { color: '#607d8b' }, '体柔': { color: '#607d8b' },
-            '1Tス音 / 1T美': { color: '#b8860b' }, 'その他': { color: '#444444' }
+            '現代の国語': { color: '#ffadad', textColor: '#fff' }, 
+            '言語文化': { color: '#ff0000', textColor: '#fff' },
+            '論理表現Ⅰ': { color: '#ff4500', textColor: '#fff' }, 
+            '英語コミュニ': { color: '#ffa500', textColor: '#fff' },
+            '数学Ⅰ': { color: '#0055ff', textColor: '#fff' }, 
+            '数学A': { color: '#000080', textColor: '#fff' },
+            '物理基礎': { color: '#808080', textColor: '#fff' }, 
+            '化学基礎': { color: '#800080', textColor: '#fff' }, // 科学
+            '生物基礎': { color: '#008000', textColor: '#fff' },
+            '历史総合': { color: '#8b4513', textColor: '#fff' }, 
+            '地理総合': { color: '#90ee90', textColor: '#000' }, 
+            '家庭基礎': { color: '#e91e63', textColor: '#fff' }, 
+            '情報Ⅰ': { color: '#00bcd4', textColor: '#fff' }, 
+            '体育': { color: '#4caf50', textColor: '#fff' }, 
+            '保健': { color: '#3f51b5', textColor: '#fff' },
+            '柔体': { color: '#607d8b', textColor: '#fff' }, 
+            '体柔': { color: '#607d8b', textColor: '#fff' },
+            '1Tス音 / 1T美': { color: '#b8860b', textColor: '#fff' }, 
+            'その他': { color: '#ffffff', textColor: '#000000' } // 白背景に黒文字
         };
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -245,6 +257,7 @@
                 const txt = div.textContent.trim();
                 const subInfo = subjects[txt] || subjects['その他'];
                 div.style.backgroundColor = subInfo.color;
+                div.style.color = subInfo.textColor || '#fff';
             });
         }
 
@@ -322,14 +335,14 @@
             globalTasks.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
             globalTasks.forEach(task => {
                 const li = document.createElement('li'); li.className = 'task-item';
-                const subInfo = subjects[task.subject] || { color: '#444' };
+                const subInfo = subjects[task.subject] || { color: '#ffffff', textColor: '#000' };
                 li.style.borderLeftColor = subInfo.color;
                 const daysInfo = getDaysLeftClassAndText(task.deadline);
                 li.innerHTML = `
                     <div>
                         <div class="task-name">${escapeHTML(task.name)}</div>
                         <div class="task-details">
-                            <span class="subject-badge" style="background-color: ${subInfo.color}">${task.subject}</span>
+                            <span class="subject-badge" style="background-color: ${subInfo.color}; color: ${subInfo.textColor || '#fff'}">${task.subject}</span>
                             <span>締切: ${task.deadline} </span>
                             <span class="days-left ${daysInfo.class}">(${daysInfo.text})</span>
                         </div>
@@ -351,14 +364,14 @@
             globalPlans.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
             globalPlans.forEach(plan => {
                 const li = document.createElement('li'); li.className = 'task-item';
-                const subInfo = subjects[plan.subject] || { color: '#444' };
+                const subInfo = subjects[plan.subject] || { color: '#ffffff', textColor: '#000' };
                 li.style.borderLeftColor = subInfo.color;
                 const daysInfo = getDaysLeftClassAndText(plan.deadline);
                 li.innerHTML = `
                     <div>
                         <div class="task-name">${escapeHTML(plan.name)}</div>
                         <div class="task-details">
-                            <span class="subject-badge" style="background-color: ${subInfo.color}">${plan.subject}</span>
+                            <span class="subject-badge" style="background-color: ${subInfo.color}; color: ${subInfo.textColor || '#fff'}">${plan.subject}</span>
                             <span>日程: ${plan.deadline} </span>
                             <span class="days-left ${daysInfo.class}">(${daysInfo.text})</span>
                         </div>
@@ -387,12 +400,12 @@
             filtered.forEach(h => {
                 const li = document.createElement('li'); li.className = 'task-item history-item';
                 const compDate = new Date(h.completedAt).toLocaleDateString('ja-JP');
-                const subInfo = subjects[h.subject] || { color: '#444' };
+                const subInfo = subjects[h.subject] || { color: '#ffffff', textColor: '#000' };
                 li.innerHTML = `
                     <div>
                         <div class="task-name" style="text-decoration: line-through; color: var(--text-muted);">${escapeHTML(h.name)}</div>
                         <div class="task-details">
-                            <span class="subject-badge" style="background-color: ${subInfo.color}">${h.subject}</span>
+                            <span class="subject-badge" style="background-color: ${subInfo.color}; color: ${subInfo.textColor || '#fff'}">${h.subject}</span>
                             <span>当初締切: ${h.deadline}</span>
                             <div class="history-date">🗹 ${compDate} に完了</div>
                         </div>
@@ -433,7 +446,7 @@
                 targetItems.forEach(item => {
                     const row = document.createElement('div');
                     row.className = "detail-row-item";
-                    const subInfo = subjects[item.subject] || { color: '#444' };
+                    const subInfo = subjects[item.subject] || { color: '#ffffff', textColor: '#000' };
                     row.style.borderLeftColor = subInfo.color;
                     
                     const daysInfo = getDaysLeftClassAndText(item.deadline);
@@ -441,7 +454,7 @@
                         <div style="flex-grow:1;">
                             <div style="font-weight:bold; font-size:18px; color:#fff;">${escapeHTML(item.name)}</div>
                             <div style="font-size:13px; margin-top:4px; color:var(--text-muted);">
-                                <span class="subject-badge" style="background-color: ${subInfo.color}">${item.subject}</span>
+                                <span class="subject-badge" style="background-color: ${subInfo.color}; color: ${subInfo.textColor || '#fff'}">${item.subject}</span>
                                 <span class="${daysInfo.class}" style="font-weight:bold;">(${daysInfo.text})</span>
                             </div>
                         </div>
@@ -487,8 +500,10 @@
                 const dayNumSpan = document.createElement('span'); dayNumSpan.className = 'day-num'; dayNumSpan.textContent = day; cell.appendChild(dayNumSpan);
 
                 items.filter(item => item.deadline === thisDateStr).forEach(item => {
-                    const subInfo = subjects[item.subject] || { color: '#444' };
-                    const dot = document.createElement('div'); dot.className = 'cal-item-dot'; dot.style.backgroundColor = subInfo.color; 
+                    const subInfo = subjects[item.subject] || { color: '#ffffff', textColor: '#000' };
+                    const dot = document.createElement('div'); dot.className = 'cal-item-dot'; 
+                    dot.style.backgroundColor = subInfo.color; 
+                    dot.style.color = subInfo.textColor || '#fff';
                     dot.textContent = `${type === 'task' ? '📝' : '📅'}${item.name}`; 
                     cell.appendChild(dot);
                 });
@@ -548,8 +563,10 @@
         <button class="tab-btn timetable-tab-btn" onclick="switchPage('page4')">4. 🏫 時間割</button>
     </div>
 
+    <!-- ページ1: 登録 -->
     <div id="page1" class="page active">
         <div class="form-flex">
+            <!-- 提出物登録ボックス -->
             <div class="form-card">
                 <h3>📝 提出物の登録</h3>
                 <div class="form-group">
@@ -573,6 +590,7 @@
                 <button class="submit-btn" onclick="addTask()">締め切りを追加する</button>
             </div>
 
+            <!-- 予定表登録ボックス -->
             <div class="form-card" style="border-color: var(--plan-color);">
                 <h3 style="color: #e040fb; border-color: var(--plan-color);">📅 予定・テストの登録</h3>
                 <div class="form-group">
@@ -598,6 +616,7 @@
         </div>
     </div>
 
+    <!-- ページ2: 提出物カレンダー -->
     <div id="page2" class="page">
         <h2>📋 提出物締め切り一覧（日付順）</h2>
         <ul id="taskList" class="task-list"></ul>
@@ -610,8 +629,10 @@
         </div>
         <div id="taskCalendarBox"></div>
 
+        <!-- タップ拡大詳細表示エリア -->
         <div id="taskDayDetailDisplay" class="detail-view-card"></div>
 
+        <!-- 完了済みタスクエリア -->
         <div class="archive-container">
             <div class="archive-header">
                 <h3 style="margin: 0; color: var(--success-color);">✅ 完了済みのタスク</h3>
@@ -622,6 +643,7 @@
         </div>
     </div>
 
+    <!-- ページ3: 予定表一覧 -->
     <div id="page3" class="page">
         <h2>📆 予定・テストスケジュール（日付順）</h2>
         <ul id="planList" class="task-list"></ul>
@@ -634,9 +656,11 @@
         </div>
         <div id="planCalendarBox"></div>
 
+        <!-- タップ拡大詳細表示エリア -->
         <div id="planDayDetailDisplay" class="detail-view-card plan-detail"></div>
     </div>
 
+    <!-- ページ4: 時間割 -->
     <div id="page4" class="page">
         <h2>🏫 クラス時間割表</h2>
         <div class="timetable-card">
@@ -652,6 +676,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <!-- 0時間目 -->
                     <tr>
                         <td class="period-col">0</td>
                         <td>
@@ -690,6 +715,7 @@
                             </div>
                         </td>
                     </tr>
+                    <!-- 1時間目 -->
                     <tr>
                         <td class="period-col">1</td>
                         <td>
@@ -728,6 +754,7 @@
                             </div>
                         </td>
                     </tr>
+                    <!-- 2時間目 -->
                     <tr>
                         <td class="period-col">2</td>
                         <td>
@@ -766,6 +793,7 @@
                             </div>
                         </td>
                     </tr>
+                    <!-- 3時間目 -->
                     <tr>
                         <td class="period-col">3</td>
                         <td>
@@ -804,6 +832,7 @@
                             </div>
                         </td>
                     </tr>
+                    <!-- 4時間目 -->
                     <tr>
                         <td class="period-col">4</td>
                         <td>
@@ -842,6 +871,7 @@
                             </div>
                         </td>
                     </tr>
+                    <!-- 5時間目 -->
                     <tr>
                         <td class="period-col">5</td>
                         <td>
@@ -880,6 +910,7 @@
                             </div>
                         </td>
                     </tr>
+                    <!-- 6時間目 -->
                     <tr>
                         <td class="period-col">6</td>
                         <td>
