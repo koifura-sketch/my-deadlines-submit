@@ -68,6 +68,7 @@
         }
         .task-name { font-weight: bold; font-size: 18px; }
         .task-details { font-size: 14px; margin-top: 4px; }
+        .task-actions { display: flex; gap: 8px; }
 
         .subject-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px; color: #fff; }
 
@@ -154,29 +155,29 @@
         let selectedTaskDateStr = "";
         let selectedPlanDateStr = "";
 
-        // 教科名と指定カラーのマッピングを完全に一致させました
+        // カラー設定（英語コミュニを「英コミュ」に変更）
         const subjects = {
-            '現代の国語': { color: '#ffadad', textColor: '#000000' }, // 薄めの赤（文字は見やすい黒）
+            '現代の国語': { color: '#ffadad', textColor: '#000000' }, // 薄めの赤
             '言語文化': { color: '#ff0000', textColor: '#ffffff' }, // 赤
-            '論理表現Ⅰ': { color: '#ff4500', textColor: '#ffffff' }, // 英語論理表現：濃いオレンジ
-            '英語コミュニ': { color: '#ffa500', textColor: '#ffffff' }, // 英語コミュニケーション：オレンジ色
+            '論理表現Ⅰ': { color: '#ff4500', textColor: '#ffffff' }, // 濃いオレンジ
+            '英コミュ': { color: '#ffa500', textColor: '#ffffff' }, // オレンジ色（英コミュに名称変更）
             '数学Ⅰ': { color: '#0055ff', textColor: '#ffffff' }, // 青色
             '数学A': { color: '#000080', textColor: '#ffffff' }, // 紺色
             '物理基礎': { color: '#808080', textColor: '#ffffff' }, // 灰色
-            '化学基礎': { color: '#800080', textColor: '#ffffff' }, // 科学：紫
+            '化学基礎': { color: '#800080', textColor: '#ffffff' }, // 紫
             '生物基礎': { color: '#008000', textColor: '#ffffff' }, // 緑
             '歴史総合': { color: '#8b4513', textColor: '#ffffff' }, // 茶色
-            '地理総合': { color: '#90ee90', textColor: '#000000' }, // 薄い緑（文字は黒）
-            '家庭基礎': { color: '#e91e63', textColor: '#ffffff' }, // その他お任せ（ピンク）
-            '情報Ⅰ': { color: '#00bcd4', textColor: '#ffffff' }, // その他お任せ（水色）
-            '体育': { color: '#4caf50', textColor: '#ffffff' }, // その他お任せ
-            '保健': { color: '#3f51b5', textColor: '#ffffff' }, // その他お任せ
-            '柔体': { color: '#607d8b', textColor: '#ffffff' }, // その他お任せ
-            '体柔': { color: '#607d8b', textColor: '#ffffff' }, // その他お任せ
-            '1Tス音 / 1T美': { color: '#b8860b', textColor: '#ffffff' }, // その他お任せ
+            '地理総合': { color: '#90ee90', textColor: '#000000' }, // 薄い緑
+            '家庭基礎': { color: '#e91e63', textColor: '#ffffff' }, 
+            '情報Ⅰ': { color: '#00bcd4', textColor: '#ffffff' }, 
+            '体育': { color: '#4caf50', textColor: '#ffffff' }, 
+            '保健': { color: '#3f51b5', textColor: '#ffffff' },
+            '柔体': { color: '#607d8b', textColor: '#ffffff' }, 
+            '体柔': { color: '#607d8b', textColor: '#ffffff' },
+            '1Tス音 / 1T美': { color: '#b8860b', textColor: '#ffffff' }, 
             '高1ST総探': { color: '#444444', textColor: '#ffffff' },
             'LHR': { color: '#444444', textColor: '#ffffff' },
-            'その他': { color: '#ffffff', textColor: '#000000' } // 白（文字は黒）
+            'その他': { color: '#ffffff', textColor: '#000000' } // 白
         };
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -190,7 +191,10 @@
                 const data = snapshot.val();
                 if (data) {
                     Object.keys(data).forEach(key => {
-                        let item = data[key]; item.databaseId = key; globalTasks.push(item);
+                        let item = data[key]; item.databaseId = key;
+                        // 古い「英語コミュニ」データが残っていたら自動で「英コミュ」に読み替える
+                        if(item.subject === '英語コミュニ') item.subject = '英コミュ';
+                        globalTasks.push(item);
                     });
                 }
                 renderTasks(); renderTaskCalendar(); showDayDetail(selectedTaskDateStr, 'task');
@@ -203,7 +207,9 @@
                 const data = snapshot.val();
                 if (data) {
                     Object.keys(data).forEach(key => {
-                        let item = data[key]; item.databaseId = key; globalPlans.push(item);
+                        let item = data[key]; item.databaseId = key;
+                        if(item.subject === '英語コミュニ') item.subject = '英コミュ';
+                        globalPlans.push(item);
                     });
                 }
                 renderPlans(); renderPlanCalendar(); showDayDetail(selectedPlanDateStr, 'plan');
@@ -216,7 +222,9 @@
                 const data = snapshot.val();
                 if (data) {
                     Object.keys(data).forEach(key => {
-                        let item = data[key]; item.databaseId = key; globalHistory.push(item);
+                        let item = data[key]; item.databaseId = key;
+                        if(item.subject === '英語コミュニ') item.subject = '英コミュ';
+                        globalHistory.push(item);
                     });
                 }
                 renderHistory();
@@ -261,7 +269,8 @@
 
         function initTimetableStyles() {
             document.querySelectorAll('.cell-subject').forEach(div => {
-                const txt = div.textContent.trim();
+                let txt = div.textContent.trim();
+                if(txt === '英語コミュニ') { txt = '英コミュ'; div.textContent = '英コミュ'; }
                 const subInfo = subjects[txt] || subjects['その他'];
                 div.style.backgroundColor = subInfo.color;
                 div.style.color = subInfo.textColor || '#ffffff';
@@ -311,9 +320,24 @@
             }
         };
 
+        // 提出物の直接削除
+        window.deleteTask = function(databaseId) {
+            if (confirm('この提出物タスクを削除しますか？')) {
+                remove(ref(db, 'tasks/' + currentUsername + '/' + databaseId));
+            }
+        };
+
+        // 予定の削除
         window.deletePlan = function(databaseId) {
             if (confirm('この予定を削除しますか？')) {
                 remove(ref(db, 'plans/' + currentUsername + '/' + databaseId));
+            }
+        };
+
+        // 完了済み履歴の削除
+        window.deleteHistory = function(databaseId) {
+            if (confirm('この完了済み履歴を完全に削除しますか？')) {
+                remove(ref(db, 'history/' + currentUsername + '/' + databaseId));
             }
         };
 
@@ -354,7 +378,10 @@
                             <span class="days-left ${daysInfo.class}">(${daysInfo.text})</span>
                         </div>
                     </div>
-                    <button class="action-btn comp" onclick="completeTask('${task.databaseId}', '${escapeHTML(task.name)}', '${task.subject}', '${task.deadline}')">完了</button>
+                    <div class="task-actions">
+                        <button class="action-btn comp" onclick="completeTask('${task.databaseId}', '${escapeHTML(task.name)}', '${task.subject}', '${task.deadline}')">完了</button>
+                        <button class="action-btn del" onclick="deleteTask('${task.databaseId}')">削除</button>
+                    </div>
                 `;
                 taskList.appendChild(li);
             });
@@ -417,6 +444,7 @@
                             <div class="history-date">🗹 ${compDate} に完了</div>
                         </div>
                     </div>
+                    <button class="action-btn del" onclick="deleteHistory('${h.databaseId}')">削除</button>
                 `;
                 historyList.appendChild(li);
             });
