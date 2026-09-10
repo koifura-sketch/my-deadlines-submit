@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>シフト・家族管理アプリ</title>
+  
+  <!-- Supabase SDKの読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --text: #1f2937;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding-bottom: 75px; touch-action: manipulation; }
+    
+    /* ナビゲーションバー */
+    nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; display: flex; border-top: 1px solid #e5e7eb; z-index: 100; }
+    nav button { flex: 1; padding: 10px 2px; border: none; background: none; font-size: 10px; color: #6b7280; font-weight: bold; cursor: pointer; }
+    nav button.active { color: var(--primary); border-top: 3px solid var(--primary); }
+
+    /* ページ切り替え */
+    .page { display: none; padding: 15px; max-width: 600px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    /* 共通UI */
+    h2 { font-size: 18px; margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 8px; }
+    .card { background: var(--card); padding: 15px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; }
+    label { display: block; font-size: 12px; color: #6b7280; margin-top: 10px; margin-bottom: 3px; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+    button.btn-main { width: 100%; background: var(--primary); color: #fff; border: none; padding: 12px; border-radius: 6px; font-weight: bold; margin-top: 15px; cursor: pointer; }
+    
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+    .btn-del { background: #fee2e2; color: var(--danger); border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; }
+
+    /* 1ページ目：カレンダー */
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .day-header { background: #f9fafb; padding: 8px 2px; text-align: center; font-size: 11px; font-weight: bold; }
+    .day-cell { background: #fff; min-height: 70px; padding: 3px; font-size: 10px; cursor: pointer; }
+    .day-cell.other-month { background: #f9fafb; opacity: 0.4; }
+    .day-num { font-weight: bold; margin-bottom: 2px; }
+    .task-chip { padding: 2px 4px; border-radius: 3px; color: #fff; font-size: 9px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* モーダル */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+    .modal.active { display: flex; }
+    .modal-content { background: #fff; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; position: relative; }
+    .close-btn { position: absolute; top: 10px; right: 15px; font-size: 20px; border: none; background: none; cursor: pointer; }
+
+    /* 2ページ目：ミニカレンダー選択 */
+    .mini-calendar-cell { background: #fff; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 1px solid #f0f0f0; }
+    .mini-calendar-cell.other-month { opacity: 0.3; pointer-events: none; }
+    .mini-calendar-cell.selected { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* 4ページ目：給与・領収書 */
+    .pay-card { border-left: 5px solid var(--primary); }
+    .history-item { font-size: 11px; color: #4b5563; border-bottom: 1px dashed #e5e7eb; padding: 4px 0; }
+    .receipt-box { border: 2px dashed #d1d5db; padding: 15px; background: #fafafa; border-radius: 8px; margin-top: 10px; }
+    .receipt-title { text-align: center; font-size: 16px; font-weight: bold; border-bottom: 2px solid #374151; padding-bottom: 5px; margin-bottom: 10px; }
+    .receipt-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+
+    /* 5ページ目：ホワイトボード */
+    .board-container { position: relative; background: #fff; border: 2px dashed #cbd5e1; border-radius: 8px; height: 380px; overflow: hidden; margin-top: 10px; touch-action: none; }
+    #whiteboard-canvas { width: 100%; height: 100%; cursor: crosshair; }
+    .board-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .sticky-note { position: absolute; padding: 10px; border-radius: 6px; box-shadow: 2px 2px 5px rgba(0,0,0,0.15); font-size: 12px; max-width: 120px; word-break: break-all; cursor: move; }
+    .color-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 2px rgba(0,0,0,0.3); cursor: pointer; display: inline-block; }
+  </style>
+</head>
+<body>
+
+  <!-- 1ページ目：カレンダー -->
+  <section id="page1" class="page active">
+    <div class="calendar-header">
+      <button onclick="changeMonth(-1)">◀</button>
+      <h3 id="calendar-title"></h3>
+      <button onclick="changeMonth(1)">▶</button>
+    </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+  </section>
+
+  <!-- 2ページ目：シフト割り当て -->
+  <section id="page2" class="page">
+    <h2>シフトを追加</h2>
+    <div class="card">
+      <label>タスク（仕事内容）を選択</label>
+      <select id="assign-task-select"></select>
+
+      <label>日程を選択（月切り替え・複数選択可能）</label>
+      <div class="calendar-header" style="margin-top: 10px;">
+        <button onclick="changePickerMonth(-1)">◀</button>
+        <h4 id="picker-calendar-title" style="font-size:14px;"></h4>
+        <button onclick="changePickerMonth(1)">▶</button>
+      </div>
+      <div class="calendar-grid" id="picker-calendar-grid"></div>
+
+      <button class="btn-main" onclick="addShift()">選択した日程へ追加</button>
+    </div>
+  </section>
+
+  <!-- 3ページ目：マスター登録＆削除 -->
+  <section id="page3" class="page">
+    <h2>仕事内容の登録・管理</h2>
+    <div class="card">
+      <label>タスク名</label>
+      <input type="text" id="task-name" placeholder="例: ホール作成">
+      <label>内容</label>
+      <input type="text" id="task-desc" placeholder="例: 設営・清掃作業">
+      <label>金額 (円)</label>
+      <input type="number" id="task-price" placeholder="5000">
+      <label>表示カラー</label>
+      <input type="color" id="task-color" value="#4f46e5" style="height:40px;">
+      <button class="btn-main" onclick="saveTask()">タスクを作成</button>
+      
+      <label style="margin-top:20px; font-weight:bold; color:#374151;">登録済みタスク一覧</label>
+      <div id="registered-tasks-list"></div>
+    </div>
+
+    <h2>スタッフの登録・管理</h2>
+    <div class="card">
+      <label>名前</label>
+      <input type="text" id="person-name" placeholder="例: 田中">
+      <button class="btn-main" onclick="savePerson()">スタッフを追加</button>
+
+      <label style="margin-top:20px; font-weight:bold; color:#374151;">登録済みスタッフ一覧</label>
+      <div id="registered-people-list"></div>
+    </div>
+  </section>
+
+  <!-- 4ページ目：給与管理 -->
+  <section id="page4" class="page">
+    <h2>給与・報酬状況</h2>
+    <div id="payroll-list"></div>
+  </section>
+
+  <!-- 5ページ目：ホワイトボード -->
+  <section id="page5" class="page">
+    <h2>家族連絡ボード</h2>
+    <div class="card">
+      <div class="board-tools">
+        <span style="font-size:12px; font-weight:bold;">ペン色:</span>
+        <span class="color-dot" style="background:#000000;" onclick="setPenColor('#000000')"></span>
+        <span class="color-dot" style="background:#ef4444;" onclick="setPenColor('#ef4444')"></span>
+        <span class="color-dot" style="background:#3b82f6;" onclick="setPenColor('#3b82f6')"></span>
+        <span class="color-dot" style="background:#10b981;" onclick="setPenColor('#10b981')"></span>
+        <button class="btn-del" style="margin-left:auto;" onclick="clearCanvas()">手書き消去</button>
+      </div>
+
+      <div class="board-container" id="board-container">
+        <canvas id="whiteboard-canvas"></canvas>
+      </div>
+
+      <label style="margin-top:15px;">付箋メッセージを追加</label>
+      <div style="display:flex; gap:5px;">
+        <input type="text" id="sticky-text" placeholder="例: 今日夜ご飯いらないです">
+        <select id="sticky-color" style="width:100px;">
+          <option value="#fef08a">黄</option>
+          <option value="#bbf7d0">緑</option>
+          <option value="#bfdbfe">青</option>
+          <option value="#fbcfe8">ピンク</option>
+        </select>
+        <button class="btn-main" style="margin-top:0; width:80px;" onclick="addStickyNote()">貼る</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- タスク詳細・完了モーダル -->
+  <div class="modal" id="task-modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeModal('task-modal')">×</button>
+      <h3 id="modal-title"></h3>
+      <p id="modal-desc" style="font-size:13px; color:#6b7280; margin: 8px 0;"></p>
+      <p id="modal-price" style="font-weight:bold; color:var(--primary); margin-bottom:15px;"></p>
+      
+      <div id="modal-action-area">
+        <label>担当者（完了者）を選択</label>
+        <select id="modal-person-select"></select>
+        <button class="btn-main" onclick="completeTask()">完了にして金額を入金</button>
+      </div>
+      <div id="modal-status-area" style="display:none; margin-top:15px; font-weight:bold; color:green;">
+        ✓ 完了済み
+      </div>
+    </div>
+  </div>
+
+  <!-- 領収書モーダル -->
+  <div class="modal" id="receipt-modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeModal('receipt-modal')">×</button>
+      <div class="receipt-box">
+        <div class="receipt-title">支給明細・領収書</div>
+        <div class="receipt-row"><span>受領者:</span><strong id="receipt-worker"></strong></div>
+        <div class="receipt-row"><span>精算日:</span><span id="receipt-date"></span></div>
+        <div class="receipt-row" style="border-top:1px solid #e5e7eb; padding-top:5px; margin-top:5px;">
+          <span>合計支給額:</span><strong id="receipt-amount" style="font-size:16px; color:var(--primary);"></strong>
+        </div>
+        <div style="margin-top:10px; font-size:11px; font-weight:bold; color:#6b7280;">【実行タスク内訳】</div>
+        <div id="receipt-details" style="margin-top:5px; border-top:1px dashed #d1d5db; padding-top:5px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下部ナビゲーション -->
+  <nav>
+    <button class="active" onclick="showPage(1)">① カレンダー</button>
+    <button onclick="showPage(2)">② シフト追加</button>
+    <button onclick="showPage(3)">③ 設定</button>
+    <button onclick="showPage(4)">④ 給与</button>
+    <button onclick="showPage(5)">⑤ メモボード</button>
+  </nav>
+
+  <script>
+    // --- Supabaseの初期設定 ---
+    const SUPABASE_URL = 'https://ablicfkizczxylafrtfs.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_01wpaMvkpqgnLCVn8u4Vcw_uw_lcI8t';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const TABLE_NAME = 'A project of my home work';
+
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    let people = JSON.parse(localStorage.getItem('people')) || [];
+    let shifts = []; 
+    let history = JSON.parse(localStorage.getItem('history')) || [];
+    let stickies = JSON.parse(localStorage.getItem('stickies')) || [];
+
+    let currentDate = new Date();
+    let pickerDate = new Date();
+    let selectedDates = [];
+    let activeShiftId = null;
+
+    let canvas, ctx;
+    let isDrawing = false;
+    let penColor = '#000000';
+
+    window.onload = async () => {
+      await fetchShiftsFromSupabase(); // Supabaseからデータ取得
+      renderCalendar();
+      updateTaskSelect();
+      renderMiniCalendar();
+      renderPayroll();
+      renderMasterLists();
+      initCanvas();
+      renderStickies();
+      subscribeToRealtime(); // リアルタイム同期を有効化
+    };
+
+    // --- Supabaseデータ処理 ---
+    async function fetchShiftsFromSupabase() {
+      const { data, error } = await _supabase.from(TABLE_NAME).select('*');
+      if (error) {
+        console.error('Supabaseデータ取得エラー:', error);
+      } else if (data) {
+        // DBのカラム構造をアプリ用に変換
+        shifts = data.map(row => ({
+          id: row.id,
+          taskId: Number(row.time_slot), // time_slot に taskId を保持
+          date: row.date,
+          completed: row.pay > 0,        // payが0より大きければ完了判定
+          worker: row.hourly_wage ? String(row.hourly_wage) : '' // 担当者保持
+        }));
+      }
+    }
+
+    // リアルタイム同期
+    function subscribeToRealtime() {
+      _supabase
+        .channel('public:shifts')
+        .on('postgres_changes', { event: '*', schema: 'public', table: TABLE_NAME }, async () => {
+          await fetchShiftsFromSupabase();
+          renderCalendar();
+          renderPayroll();
+        })
+        .subscribe();
+    }
+
+    function saveData() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      localStorage.setItem('people', JSON.stringify(people));
+      localStorage.setItem('history', JSON.stringify(history));
+      localStorage.setItem('stickies', JSON.stringify(stickies));
+    }
+
+    function showPage(num) {
+      document.querySelectorAll('.page').forEach((p, i) => p.classList.toggle('active', i === num - 1));
+      document.querySelectorAll('nav button').forEach((b, i) => b.classList.toggle('active', i === num - 1));
+      if(num === 1) renderCalendar();
+      if(num === 2) { updateTaskSelect(); renderMiniCalendar(); }
+      if(num === 3) renderMasterLists();
+      if(num === 4) renderPayroll();
+      if(num === 5) resizeCanvas();
+    }
+
+    // --- 1ページ目：カレンダー ---
+    function renderCalendar() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      document.getElementById('calendar-title').innerText = `${year}年 ${month + 1}月`;
+      
+      const grid = document.getElementById('calendar-grid');
+      grid.innerHTML = '';
+
+      const days = ['日','月','火','水','木','金','土'];
+      days.forEach(d => grid.innerHTML += `<div class="day-header">${d}</div>`);
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        grid.innerHTML += `<div class="day-cell other-month"></div>`;
+      }
+
+      for (let date = 1; date <= lastDate; date++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+        const dayShifts = shifts.filter(s => s.date === dateStr);
+
+        let chipsHtml = '';
+        dayShifts.forEach(s => {
+          const task = tasks.find(t => t.id === s.taskId);
+          if (task) {
+            chipsHtml += `<div class="task-chip" style="background:${task.color}" onclick="event.stopPropagation(); openTaskModal(${s.id})">
+              ${s.completed ? '✓ ' : ''}${task.name}
+            </div>`;
+          }
+        });
+
+        grid.innerHTML += `
+          <div class="day-cell">
+            <div class="day-num">${date}</div>
+            ${chipsHtml}
+          </div>`;
+      }
+    }
+
+    function changeMonth(diff) {
+      currentDate.setMonth(currentDate.getMonth() + diff);
+      renderCalendar();
+    }
+
+    // --- モーダル表示 ---
+    function openTaskModal(shiftId) {
+      activeShiftId = shiftId;
+      const shift = shifts.find(s => s.id === shiftId);
+      const task = tasks.find(t => t.id === shift.taskId);
+
+      document.getElementById('modal-title').innerText = task ? task.name : 'タスク';
+      document.getElementById('modal-desc').innerText = task ? task.desc : '';
+      document.getElementById('modal-price').innerText = `金額: ¥${task ? task.price.toLocaleString() : 0}`;
+
+      const select = document.getElementById('modal-person-select');
+      select.innerHTML = people.map(p => `<option value="${p}">${p}</option>`).join('');
+
+      const actionArea = document.getElementById('modal-action-area');
+      const statusArea = document.getElementById('modal-status-area');
+
+      if (shift.completed) {
+        actionArea.style.display = 'none';
+        statusArea.style.display = 'block';
+        statusArea.innerText = `✓ ${shift.worker} さんが完了済み`;
+      } else {
+        actionArea.style.display = 'block';
+        statusArea.style.display = 'none';
+      }
+
+      document.getElementById('task-modal').classList.add('active');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    async function completeTask() {
+      const worker = document.getElementById('modal-person-select').value;
+      if (!worker) return alert('担当者を選択してください（「設定」タブから追加できます）');
+
+      const shift = shifts.find(s => s.id === activeShiftId);
+      const task = tasks.find(t => t.id === shift.taskId);
+
+      // Supabaseを更新（payに金額を入れることで完了フラグ化）
+      const { error } = await _supabase
+        .from(TABLE_NAME)
+        .update({ pay: task ? task.price : 1, hourly_wage: worker })
+        .eq('id', activeShiftId);
+
+      if (error) {
+        alert('完了処理に失敗しました: ' + error.message);
+        return;
+      }
+
+      shift.completed = true;
+      shift.worker = worker;
+
+      closeModal('task-modal');
+      await fetchShiftsFromSupabase();
+      renderCalendar();
+    }
+
+    // --- 2ページ目：ミニカレンダー選択 ---
+    function updateTaskSelect() {
+      const select = document.getElementById('assign-task-select');
+      select.innerHTML = tasks.map(t => `<option value="${t.id}">${t.name} (¥${t.price})</option>`).join('');
+    }
+
+    function renderMiniCalendar() {
+      const year = pickerDate.getFullYear();
+      const month = pickerDate.getMonth();
+      document.getElementById('picker-calendar-title').innerText = `${year}年 ${month + 1}月`;
+
+      const grid = document.getElementById('picker-calendar-grid');
+      grid.innerHTML = '';
+
+      const days = ['日','月','火','水','木','金','土'];
+      days.forEach(d => grid.innerHTML += `<div class="day-header">${d}</div>`);
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        grid.innerHTML += `<div class="mini-calendar-cell other-month"></div>`;
+      }
+
+      for (let d = 1; d <= lastDate; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const isSelected = selectedDates.includes(dateStr);
+
+        const el = document.createElement('div');
+        el.className = `mini-calendar-cell ${isSelected ? 'selected' : ''}`;
+        el.innerText = d;
+        el.onclick = () => {
+          if (selectedDates.includes(dateStr)) {
+            selectedDates = selectedDates.filter(x => x !== dateStr);
+          } else {
+            selectedDates.push(dateStr);
+          }
+          renderMiniCalendar();
+        };
+        grid.appendChild(el);
+      }
+    }
+
+    function changePickerMonth(diff) {
+      pickerDate.setMonth(pickerDate.getMonth() + diff);
+      renderMiniCalendar();
+    }
+
+    async function addShift() {
+      const taskId = parseInt(document.getElementById('assign-task-select').value);
+      if (!taskId) return alert('「設定」からタスクを作成してください');
+      if (selectedDates.length === 0) return alert('日程を選択してください');
+
+      // Supabaseに一括登録
+      const insertData = selectedDates.map(date => ({
+        date: date,
+        time_slot: String(taskId),
+        hourly_wage: 0,
+        hours: 0,
+        pay: 0
+      }));
+
+      const { error } = await _supabase.from(TABLE_NAME).insert(insertData);
+
+      if (error) {
+        alert('シフトの追加に失敗しました: ' + error.message);
+        return;
+      }
+
+      await fetchShiftsFromSupabase();
+      alert('カレンダーに追加しました！');
+      selectedDates = [];
+      showPage(1);
+    }
+
+    // --- 3ページ目：マスタ登録＆削除 ---
+    function saveTask() {
+      const name = document.getElementById('task-name').value;
+      const desc = document.getElementById('task-desc').value;
+      const price = parseInt(document.getElementById('task-price').value);
+      const color = document.getElementById('task-color').value;
+
+      if (!name || isNaN(price)) return alert('タスク名と金額を入力してください');
+
+      tasks.push({ id: Date.now(), name, desc, price, color });
+      saveData();
+      renderMasterLists();
+      document.getElementById('task-name').value = '';
+      document.getElementById('task-desc').value = '';
+      document.getElementById('task-price').value = '';
+    }
+
+    function deleteTask(id) {
+      if (!confirm('このタスクを削除してもよろしいですか？')) return;
+      tasks = tasks.filter(t => t.id !== id);
+      saveData();
+      renderMasterLists();
+    }
+
+    function savePerson() {
+      const name = document.getElementById('person-name').value;
+      if (!name) return alert('名前を入力してください');
+
+      people.push(name);
+      saveData();
+      renderMasterLists();
+      document.getElementById('person-name').value = '';
+    }
+
+    function deletePerson(name) {
+      if (!confirm(`${name} さんを削除してもよろしいですか？`)) return;
+      people = people.filter(p => p !== name);
+      saveData();
+      renderMasterLists();
+    }
+
+    function renderMasterLists() {
+      const taskList = document.getElementById('registered-tasks-list');
+      taskList.innerHTML = tasks.map(t => `
+        <div class="list-item">
+          <span><strong style="color:${t.color}">■</strong> ${t.name} (¥${t.price.toLocaleString()})</span>
+          <button class="btn-del" onclick="deleteTask(${t.id})">削除</button>
+        </div>
+      `).join('') || '<p style="font-size:11px; color:#9ca3af;">登録されたタスクはありません</p>';
+
+      const personList = document.getElementById('registered-people-list');
+      personList.innerHTML = people.map(p => `
+        <div class="list-item">
+          <span>${p}</span>
+          <button class="btn-del" onclick="deletePerson('${p}')">削除</button>
+        </div>
+      `).join('') || '<p style="font-size:11px; color:#9ca3af;">登録されたスタッフはありません</p>';
+    }
+
+    // --- 4ページ目：給与・領収書 ---
+    function renderPayroll() {
+      const container = document.getElementById('payroll-list');
+      container.innerHTML = '';
+
+      if (people.length === 0) {
+        container.innerHTML = '<p style="font-size:12px;">スタッフが登録されていません。</p>';
+        return;
+      }
+
+      people.forEach(person => {
+        const personShifts = shifts.filter(s => s.worker === person && s.completed);
+        
+        let totalAmount = 0;
+        let shiftLogsHtml = '';
+
+        personShifts.forEach(s => {
+          const task = tasks.find(t => t.id === s.taskId);
+          if (task) {
+            totalAmount += task.price;
+            shiftLogsHtml += `<div class="history-item">${s.date} : ${task.name} (¥${task.price.toLocaleString()})</div>`;
+          }
+        });
+
+        const personHistory = history.filter(h => h.worker === person);
+        let historyHtml = personHistory.map((h, idx) => 
+          `<div style="font-size:11px; color:var(--primary); margin-top:5px; cursor:pointer; text-decoration:underline;" onclick="openReceiptModal('${person}', ${idx})">
+            【精算済明細】${h.payDate} : ¥${h.amount.toLocaleString()} (タップで領収書表示)
+          </div>`
+        ).join('');
+
+        container.innerHTML += `
+          <div class="card pay-card">
+            <h3>${person} さん</h3>
+            <p style="font-size:20px; font-weight:bold; color:var(--primary); margin: 8px 0;">
+              未払額: ¥${totalAmount.toLocaleString()}
+            </p>
+            <div style="margin-bottom:10px;">${shiftLogsHtml || '<span style="font-size:11px;color:#9ca3af;">未精算のタスクはありません</span>'}</div>
+            ${totalAmount > 0 ? `<button class="btn-main" style="background:#10b981; margin-top:5px;" onclick="payOut('${person}', ${totalAmount})">支払完了（リセット）</button>` : ''}
+            <div style="margin-top:10px; border-top:1px solid #f3f4f6; padding-top:5px;">${historyHtml}</div>
+          </div>
+        `;
+      });
+    }
+
+    async function payOut(person, amount) {
+      if (!confirm(`${person} さんの給与（¥${amount.toLocaleString()}）を支払い完了にし、未払額をリセットしますか？`)) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const completedShifts = shifts.filter(s => s.worker === person && s.completed);
+
+      const details = completedShifts.map(s => {
+        const task = tasks.find(t => t.id === s.taskId);
+        return { date: s.date, taskName: task ? task.name : '削除されたタスク', price: task ? task.price : 0 };
+      });
+
+      history.push({
+        worker: person,
+        amount: amount,
+        payDate: today,
+        details: details
+      });
+
+      // Supabaseから該当データを削除
+      for (const s of completedShifts) {
+        await _supabase.from(TABLE_NAME).delete().eq('id', s.id);
+      }
+
+      saveData();
+      await fetchShiftsFromSupabase();
+      renderPayroll();
+    }
+
+    function openReceiptModal(person, historyIndex) {
+      const personHistory = history.filter(h => h.worker === person);
+      const record = personHistory[historyIndex];
+
+      if (!record) return;
+
+      document.getElementById('receipt-worker').innerText = `${record.worker} 様`;
+      document.getElementById('receipt-date').innerText = record.payDate;
+      document.getElementById('receipt-amount').innerText = `¥${record.amount.toLocaleString()}-`;
+
+      const detailsContainer = document.getElementById('receipt-details');
+      detailsContainer.innerHTML = record.details.map(d => `
+        <div class="receipt-row" style="color:#4b5563;">
+          <span>${d.date} : ${d.taskName}</span>
+          <span>¥${d.price.toLocaleString()}</span>
+        </div>
+      `).join('');
+
+      document.getElementById('receipt-modal').classList.add('active');
+    }
+
+    // --- 5ページ目：ホワイトボード（描画＆付箋）機能 ---
+    function initCanvas() {
+      canvas = document.getElementById('whiteboard-canvas');
+      ctx = canvas.getContext('2d');
+      resizeCanvas();
+
+      const savedDrawing = localStorage.getItem('boardDrawing');
+      if (savedDrawing) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = savedDrawing;
+      }
+
+      canvas.addEventListener('mousedown', startDraw);
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', stopDraw);
+      canvas.addEventListener('mouseleave', stopDraw);
+
+      canvas.addEventListener('touchstart', (e) => { startDraw(e.touches[0]); e.preventDefault(); });
+      canvas.addEventListener('touchmove', (e) => { draw(e.touches[0]); e.preventDefault(); });
+      canvas.addEventListener('touchend', stopDraw);
+    }
+
+    function resizeCanvas() {
+      if(!canvas) return;
+      const container = document.getElementById('board-container');
+      if(canvas.width !== container.clientWidth) {
+        const tempImg = canvas.toDataURL();
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = tempImg;
+      }
+    }
+
+    function setPenColor(color) { penColor = color; }
+
+    function startDraw(e) {
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      ctx.beginPath();
+      ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      const rect = canvas.getBoundingClientRect();
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = penColor;
+      ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+      ctx.stroke();
+    }
+
+    function stopDraw() {
+      if (isDrawing) {
+        isDrawing = false;
+        localStorage.setItem('boardDrawing', canvas.toDataURL());
+      }
+    }
+
+    function clearCanvas() {
+      if (!confirm('手書き内容を消去しますか？')) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      localStorage.removeItem('boardDrawing');
+    }
+
+    function addStickyNote() {
+      const text = document.getElementById('sticky-text').value;
+      const color = document.getElementById('sticky-color').value;
+
+      if (!text) return alert('メッセージを入力してください');
+
+      const sticky = {
+        id: Date.now(),
+        text: text,
+        color: color,
+        x: Math.random() * 100 + 20,
+        y: Math.random() * 100 + 20
+      };
+
+      stickies.push(sticky);
+      saveData();
+      renderStickies();
+      document.getElementById('sticky-text').value = '';
+    }
+
+    function deleteSticky(id) {
+      stickies = stickies.filter(s => s.id !== id);
+      saveData();
+      renderStickies();
+    }
+
+    function renderStickies() {
+      const container = document.getElementById('board-container');
+      document.querySelectorAll('.sticky-note').forEach(el => el.remove());
+
+      stickies.forEach(s => {
+        const note = document.createElement('div');
+        note.className = 'sticky-note';
+        note.style.background = s.color;
+        note.style.left = s.x + 'px';
+        note.style.top = s.y + 'px';
+        note.innerHTML = `
+          <div style="font-size:10px; text-align:right; cursor:pointer;" onclick="deleteSticky(${s.id})">✖</div>
+          <div>${s.text}</div>
+        `;
+
+        let isDragging = false, offsetClickX = 0, offsetClickY = 0;
+
+        const onStart = (e) => {
+          isDragging = true;
+          const p = e.touches ? e.touches[0] : e;
+          offsetClickX = p.clientX - note.offsetLeft;
+          offsetClickY = p.clientY - note.offsetTop;
+        };
+
+        const onMove = (e) => {
+          if (!isDragging) return;
+          const p = e.touches ? e.touches[0] : e;
+          let newX = p.clientX - offsetClickX;
+          let newY = p.clientY - offsetClickY;
+
+          newX = Math.max(0, Math.min(container.clientWidth - 110, newX));
+          newY = Math.max(0, Math.min(container.clientHeight - 80, newY));
+
+          note.style.left = newX + 'px';
+          note.style.top = newY + 'px';
+
+          s.x = newX;
+          s.y = newY;
+        };
+
+        const onEnd = () => {
+          if (isDragging) {
+            isDragging = false;
+            saveData();
+          }
+        };
+
+        note.addEventListener('mousedown', onStart);
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onEnd);
+
+        note.addEventListener('touchstart', onStart);
+        document.addEventListener('touchmove', onMove);
+        document.addEventListener('touchend', onEnd);
+
+        container.appendChild(note);
+      });
+    }
+  </script>
+</body>
+</html>
